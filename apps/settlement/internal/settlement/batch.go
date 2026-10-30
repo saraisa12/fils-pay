@@ -139,7 +139,11 @@ func CloseBatch(ctx context.Context, db *pgxpool.Pool, merchantID uuid.UUID, bus
 	if err != nil {
 		return BatchResult{}, fmt.Errorf("settlement: CloseBatch: read platform volume: %w", err)
 	}
-	tierBonusBps := VolumeTierMdrBonusBps(platformProcessedFils)
+	// B033: the discount is off until finance signs off; the counter still accumulates.
+	tierBonusBps := int64(0)
+	if VolumeTierEnabled {
+		tierBonusBps = VolumeTierMdrBonusBps(platformProcessedFils)
+	}
 
 	// Step 6: select and lock eligible events for the whole window. The
 	// join is transaction_events (many) -> transactions (one) — the safe

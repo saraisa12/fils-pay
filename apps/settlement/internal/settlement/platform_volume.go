@@ -43,3 +43,8 @@ func VolumeTierMdrBonusBps(totalProcessedFils int64) int64 {
 	}
 	return 0
 }
+
+// VolumeTierEnabled gates the platform-wide volume discount. B033: it is off
+// because no written finance sign-off exists (docs/HANDOVER.md). Keep it in
+// step with VOLUME_TIER_ENABLED in apps/api/src/fees/platformVolumeTier.ts.
+const VolumeTierEnabled = false
