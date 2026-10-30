@@ -178,6 +178,12 @@ test("one active endpoint, 2xx response: exact headers/body sent, delivery marke
   assert.equal(delivery.delivery_event_id, body.id);
 });
 
+// backoffDelayMs adds +/-10% random jitter on purpose (so retries from many endpoints do not line up).
+// This test wants the un-jittered schedule (1000, 2000, ...), so it fixes the jitter at its midpoint:
+// 0.9 + 0.5 * 0.2 = 1.0. Using the default Math.random here made the exact-value assertions below
+// pass only by luck.
+const FIXED_JITTER = () => 0.5;
+
 test("failing endpoint: backoff/exhaustion sequence across repeated runDispatchPass calls, next_attempt_at progresses correctly, exhausted at webhookMaxAttempts", async () => {
   const merchantId = await createMerchant("backoff-exhaustion");
   const endpoint = await createEndpoint(merchantId, "http://fake-receiver.test/always-500");
@@ -192,7 +198,7 @@ test("failing endpoint: backoff/exhaustion sequence across repeated runDispatchP
   assert.equal(delivery.status, "pending");
   assert.equal(delivery.attempt_count, 1);
   assert.equal(delivery.response_status_code, 500);
-  const expectedDelay1 = backoffDelayMs(1, config);
+  const expectedDelay1 = backoffDelayMs(1, config, FIXED_JITTER);
   assert.equal(expectedDelay1, 1000);
   const actualDelay1 = delivery.next_attempt_at.getTime() - Date.now();
   assert.ok(Math.abs(actualDelay1 - expectedDelay1) < 3000, `expected ~${expectedDelay1}ms, got ${actualDelay1}ms`);
@@ -212,7 +218,7 @@ test("failing endpoint: backoff/exhaustion sequence across repeated runDispatchP
   delivery = await getDelivery(String(outboxEvent.id), endpoint.id);
   assert.equal(delivery.status, "pending");
   assert.equal(delivery.attempt_count, 2);
-  const expectedDelay2 = backoffDelayMs(2, config);
+  const expectedDelay2 = backoffDelayMs(2, config, FIXED_JITTER);
   assert.equal(expectedDelay2, 2000);
   const actualDelay2 = delivery.next_attempt_at.getTime() - Date.now();
   assert.ok(Math.abs(actualDelay2 - expectedDelay2) < 3000, `expected ~${expectedDelay2}ms, got ${actualDelay2}ms`);
