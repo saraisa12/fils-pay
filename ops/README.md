@@ -4,6 +4,20 @@ Local development stack for FilsPay: Postgres plus the three services that
 talk to it directly (apps/api, apps/settlement, apps/reporting). The hosted
 demo instance uses the same compose file with a different `.env`.
 
+## Secrets
+
+Compose refuses to start without these, set in the shell (or a git-ignored `ops/.env`) before `up`:
+
+```
+export POSTGRES_PASSWORD=...                 # any strong value
+export SETTLEMENT_INTERNAL_TOKEN=...         # shared by api and settlement
+export WEBHOOK_SECRET_ENCRYPTION_KEY=$(openssl rand -base64 32)
+export ACQUIRER_CALLBACK_SIGNING_SECRET=...
+```
+
+`ops/.env.docker` holds only non-secret settings (`NODE_ENV=production`, secure cookies, OTP codes
+never returned in responses, acquirer callbacks must be signed).
+
 ## Quick start
 
 ```
