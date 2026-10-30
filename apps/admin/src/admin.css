@@ -226,3 +226,47 @@ button:disabled {
   margin-top: 0.4rem;
   font-weight: 700;
 }
+
+/* Phones: a wide table scrolls sideways inside its own box instead of
+   stretching the whole page past the screen edge, and rows stay one line
+   tall instead of wrapping every cell into 3-4 lines. */
+@media (max-width: 640px) {
+  .admin-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}
+
+/* Amount columns: right-aligned with equal-width digits, so the decimal
+   points line up and amounts can be compared down a column at a glance. */
+.admin-table .admin-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A checkbox sits on the same line as its label, not centred above it. */
+.admin-form label.admin-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Phones: the menu wraps onto extra lines instead of running off-screen. */
+@media (max-width: 640px) {
+  .admin-nav {
+    flex-wrap: wrap;
+  }
+}
+
+/* Phones: each label sits above its value instead of a fixed-width label
+   column that pushes the values past the screen edge. */
+@media (max-width: 640px) {
+  .admin-dl {
+    grid-template-columns: 1fr;
+  }
+  .admin-dl dd {
+    margin-bottom: 0.5rem;
+    overflow-wrap: anywhere;
+  }
+}

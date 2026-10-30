@@ -313,3 +313,33 @@
   min-width: 1px;
   background: #4a7ebb;
 }
+
+/* Phones: a wide table scrolls sideways inside its own box instead of
+   stretching the whole page past the screen edge, and rows stay one line
+   tall instead of wrapping every cell into 3-4 lines. */
+@media (max-width: 640px) {
+  .dash-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}
+
+/* Amount columns: right-aligned with equal-width digits, so the decimal
+   points line up and amounts can be compared down a column at a glance. */
+.dash-table .dash-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Phones: each label sits above its value instead of a fixed-width label
+   column that pushes the values past the screen edge. */
+@media (max-width: 640px) {
+  .dash-dl {
+    grid-template-columns: 1fr;
+  }
+  .dash-dl dd {
+    margin-bottom: 0.5rem;
+    overflow-wrap: anywhere;
+  }
+}

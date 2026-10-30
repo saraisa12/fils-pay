@@ -12,6 +12,13 @@ export function bhd(amountFils: number): string {
   return `${formatBhd(toFils(amountFils, { allowNegative: true }))} BHD`;
 }
 
+/** A status code as a merchant reads it: "partially_captured" -> "Partially captured".
+ *  Display only; filters and CSS classes keep the raw code. */
+export function statusLabel(status: string): string {
+  const words = status.replace(/_/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 /** `—` for a null/absent value, so an empty table cell is visibly empty
  *  rather than ambiguously blank. */
 export function dash(value: string | number | null | undefined): string {

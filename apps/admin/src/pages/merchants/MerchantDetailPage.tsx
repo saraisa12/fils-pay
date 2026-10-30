@@ -115,9 +115,20 @@ export function MerchantDetailPage() {
   // MK: it's the journaled one since Sep
   async function handleAdjustBalance(): Promise<void> {
     if (!id) return;
-    const deltaFils = Number(adjustDeltaFils.trim());
-    if (!Number.isInteger(deltaFils) || deltaFils === 0) {
-      setActionError("Enter a non-zero whole number of fils.");
+    // Entered in BD with up to 3 decimals, like "Issue credit" and the CSV
+    // import, so one page never mixes fils and BD (a 1000x typo risk).
+    let deltaFils: number;
+    try {
+      deltaFils = parseBhdToFils(adjustDeltaFils.trim());
+    } catch {
+      setActionError("Enter an amount in BD with up to 3 decimals, e.g. 50.000 or -12.500.");
+      return;
+    }
+    if (deltaFils === 0) {
+      setActionError("Enter a non-zero amount.");
+      return;
+    }
+    if (!window.confirm(`Change ${detail?.merchant.displayName ?? "this merchant"}'s balance by ${bhd(deltaFils)}?`)) {
       return;
     }
     setBusy(true);
@@ -358,12 +369,12 @@ export function MerchantDetailPage() {
       >
         <div className="admin-form">
           <label>
-            Delta (fils, may be negative)
+            Amount (BD, up to 3 decimals, negative to reduce)
             <input
               value={adjustDeltaFils}
               onChange={(e) => setAdjustDeltaFils(e.target.value)}
-              inputMode="numeric"
-              placeholder="50000"
+              inputMode="decimal"
+              placeholder="50.000"
             />
           </label>
           <label>
@@ -432,7 +443,7 @@ export function MerchantDetailPage() {
               onChange={(e) => setCreditEffectiveDate(e.target.value)}
             />
           </label>
-          <label>
+          <label className="admin-check">
             <input
               type="checkbox"
               checked={creditReverseFee}
@@ -637,9 +648,9 @@ export function MerchantDetailPage() {
             <tr>
               <th>Date</th>
               <th>Status</th>
-              <th>Gross</th>
-              <th>Fee</th>
-              <th>Net payout</th>
+              <th className="admin-num">Gross</th>
+              <th className="admin-num">Fee</th>
+              <th className="admin-num">Net payout</th>
             </tr>
           </thead>
           <tbody>
@@ -647,9 +658,9 @@ export function MerchantDetailPage() {
               <tr key={batch.id}>
                 <td>{batch.batchDate}</td>
                 <td>{batch.status}</td>
-                <td>{bhd(batch.grossFils)}</td>
-                <td>{bhd(batch.feeFils)}</td>
-                <td>{bhd(batch.netPayoutFils)}</td>
+                <td className="admin-num">{bhd(batch.grossFils)}</td>
+                <td className="admin-num">{bhd(batch.feeFils)}</td>
+                <td className="admin-num">{bhd(batch.netPayoutFils)}</td>
               </tr>
             ))}
           </tbody>
