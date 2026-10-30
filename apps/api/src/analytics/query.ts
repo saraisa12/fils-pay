@@ -48,6 +48,8 @@ export interface VolumePointDto {
   capturedCount: number;
   capturedGrossFils: number;
   voidedCount: number;
+  refundCount: number;
+  refundGrossFils: number;
 }
 
 export interface VolumesResponse {
@@ -66,6 +68,8 @@ interface VolumeRow {
   captured_count: number;
   captured_gross_fils: string | number;
   voided_count: number;
+  refund_count: number;
+  refund_gross_fils: string | number;
 }
 
 interface CursorRow {
@@ -90,6 +94,8 @@ function serializeVolumePoint(row: VolumeRow): VolumePointDto {
     capturedCount: row.captured_count,
     capturedGrossFils: Number(row.captured_gross_fils),
     voidedCount: row.voided_count,
+    refundCount: row.refund_count,
+    refundGrossFils: Number(row.refund_gross_fils),
   };
 }
 
@@ -114,7 +120,7 @@ export async function getVolumes(
 ): Promise<VolumesResponse> {
   const [pointsResult, asOf] = await Promise.all([
     pool.query<VolumeRow>(
-      `SELECT volume_date, captured_count, captured_gross_fils, voided_count
+      `SELECT volume_date, captured_count, captured_gross_fils, voided_count, refund_count, refund_gross_fils
          FROM merchant_daily_volume
         WHERE merchant_id = $1 AND volume_date >= $2 AND volume_date < $3
         ORDER BY volume_date ASC`,
@@ -137,6 +143,8 @@ export interface PayoutTrendPointDto {
   grossFils: number;
   feeFils: number;
   netPayoutFils: number;
+  refundFils: number;
+  feeReversedFils: number;
   paidAt: string | null;
 }
 
@@ -153,6 +161,8 @@ interface PayoutTrendRow {
   gross_fils: string | number;
   fee_fils: string | number;
   net_payout_fils: string | number;
+  refund_fils: string | number;
+  fee_reversed_fils: string | number;
   paid_at: Date | null;
 }
 
@@ -164,6 +174,8 @@ function serializePayoutTrendPoint(row: PayoutTrendRow): PayoutTrendPointDto {
     grossFils: Number(row.gross_fils),
     feeFils: Number(row.fee_fils),
     netPayoutFils: Number(row.net_payout_fils),
+    refundFils: Number(row.refund_fils),
+    feeReversedFils: Number(row.fee_reversed_fils),
     paidAt: row.paid_at ? row.paid_at.toISOString() : null,
   };
 }
@@ -181,7 +193,7 @@ export async function getPayoutTrends(
 ): Promise<PayoutTrendsResponse> {
   const [pointsResult, asOf] = await Promise.all([
     pool.query<PayoutTrendRow>(
-      `SELECT settlement_batch_id, batch_date, status, gross_fils, fee_fils, net_payout_fils, paid_at
+      `SELECT settlement_batch_id, batch_date, status, gross_fils, fee_fils, net_payout_fils, refund_fils, fee_reversed_fils, paid_at
          FROM merchant_payout_trends
         WHERE merchant_id = $1 AND batch_date >= $2 AND batch_date < $3
         ORDER BY batch_date ASC`,

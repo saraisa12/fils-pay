@@ -15,12 +15,14 @@ export async function refreshAnalyticsRollups(client: PoolClient): Promise<Rebui
 
   const trendResult = await client.query(
     `INSERT INTO merchant_payout_trends
-        (merchant_id, settlement_batch_id, batch_date, status, gross_fils, fee_fils, net_payout_fils, paid_at, last_updated_at)
-     SELECT merchant_id, id, batch_date, status, gross_fils, fee_fils, net_payout_fils, paid_at, now()
+        (merchant_id, settlement_batch_id, batch_date, status, gross_fils, fee_fils, net_payout_fils, paid_at,
+         refund_fils, fee_reversed_fils, last_updated_at)
+     SELECT merchant_id, id, batch_date, status, gross_fils, fee_fils, net_payout_fils, paid_at,
+            refund_fils, fee_reversed_fils, now()
        FROM settlement_batches`,
   );
 
-  const volumeResult = await client.query(
+  await client.query(
     `INSERT INTO merchant_daily_volume
         (merchant_id, volume_date, captured_count, captured_gross_fils, voided_count, last_updated_at)
      SELECT t.merchant_id,
@@ -35,5 +37,17 @@ export async function refreshAnalyticsRollups(client: PoolClient): Promise<Rebui
       GROUP BY t.merchant_id, (te.occurred_at AT TIME ZONE 'Asia/Bahrain')::date`,
   );
 
-  return { volumeRows: volumeResult.rowCount ?? 0, trendRows: trendResult.rowCount ?? 0 };
+  // Refunds, on the same Asia/Bahrain day as everything else. Upserted onto the
+  // capture/void rows (or creating a refund-only day).
+  await client.query(
+    `INSERT INTO merchant_daily_volume (merchant_id, volume_date, refund_count, refund_gross_fils, last_updated_at)
+     SELECT merchant_id, (occurred_at AT TIME ZONE 'Asia/Bahrain')::date, COUNT(*), SUM(amount_fils), now()
+       FROM refunds
+      WHERE status = 'succeeded'
+      GROUP BY merchant_id, (occurred_at AT TIME ZONE 'Asia/Bahrain')::date
+     ON CONFLICT (merchant_id, volume_date) DO UPDATE
+       SET refund_count = EXCLUDED.refund_count, refund_gross_fils = EXCLUDED.refund_gross_fils`,
+  );
+  const volumeRows = await client.query<{ n: string }>(`SELECT COUNT(*)::text AS n FROM merchant_daily_volume`);
+  return { volumeRows: Number(volumeRows.rows[0]?.n ?? 0), trendRows: trendResult.rowCount ?? 0 };
 }
