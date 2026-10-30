@@ -5,10 +5,10 @@ import { formatIsoDate } from "../lib/dateFormat.js";
 /**
  * Creates the single shared `pg.Pool` for the process. Given the 0.5 vCPU /
  * 512 MB budget for the whole API container, the pool is small on purpose
- * (`max: 5` by default) — with 0.5 vCPU the process cannot usefully execute
- * many queries concurrently anyway, and a large pool mostly wastes memory
- * (each `pg` connection holds its own buffers) while risking exhausting
- * Postgres's own `max_connections` once other services share the instance.
+ * (`max: 20` by default) — each connection holds its own buffers and counts
+ * against Postgres's `max_connections` once other services share the instance,
+ * but a checkout holds a connection for ~0.5 s while it calls the acquirer, so a
+ * pool of 5 capped the whole checkout at ~9 per second (docs/CAPACITY.md).
  *
  * This should be created once in `index.ts` and never per-request.
  */
