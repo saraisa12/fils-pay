@@ -35,6 +35,13 @@ export async function rotateApiKeyAsAdmin(
       rotatedFromKeyId: input.apiKeyId,
     });
 
+    // Rotation means the old key stops working. Issuing a replacement while leaving the old key
+    // valid forever (docs claim a "24h grace period", they do not, and no job ever revoked it)
+    // defeats the point when the key was rotated because it leaked.
+    await client.query(`UPDATE api_keys SET revoked_at = now(), revoked_reason = 'rotated' WHERE id = $1`, [
+      input.apiKeyId,
+    ]);
+
     await insertAdminAuditLog(client, {
       adminUserId: input.adminUserId,
       action: "api_key_rotate",
