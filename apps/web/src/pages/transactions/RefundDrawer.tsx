@@ -19,7 +19,8 @@ interface RefundResponse {
 
 interface RefundDrawerProps {
   txn: TransactionDto;
-  onRefunded: () => Promise<void>;
+  /** Called after a successful refund with a message to show the merchant. */
+  onRefunded: (message: string) => Promise<void>;
 }
 
 const REFUNDABLE_STATUSES: ReadonlyArray<TransactionDto["status"]> = [
@@ -92,7 +93,7 @@ export function RefundDrawer({ txn, onRefunded }: RefundDrawerProps) {
       setReason("");
       // Refetch rather than patch: the refund wrote a new transaction_events
       // row server-side, so the timeline is stale, not merely shorter.
-      await onRefunded();
+      await onRefunded(`Refunded ${shown} to the cardholder.`);
     } catch (err) {
       setError(describeError(err));
     } finally {

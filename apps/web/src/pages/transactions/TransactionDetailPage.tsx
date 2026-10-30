@@ -36,11 +36,20 @@ type LoadState =
  * for both (a `403` would confirm a foreign transaction's existence), and
  * this page does not undo that by guessing.
  */
+/** Who did it, as a merchant reads it (the raw type is a database code). */
+const ACTOR_LABELS: Record<string, string> = {
+  merchant_session: "Merchant dashboard",
+  merchant_api_key: "API key",
+  system: "FilsPay",
+};
+
 export function TransactionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [events, setEvents] = useState<TransactionEventDto[]>([]);
   const [actionError, setActionError] = useState<string | null>(null);
+  // Shown after a refund so the merchant sees it went through.
+  const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [captureOpen, setCaptureOpen] = useState(false);
   const [captureAmount, setCaptureAmount] = useState("");
@@ -161,6 +170,12 @@ export function TransactionDetailPage() {
         <dd>{bhd(txn.capturedFils)}</dd>
         <dt>Refunded amount</dt>
         <dd>{bhd(txn.refundedFils)}</dd>
+        {txn.refundedFils > 0 ? (
+          <>
+            <dt>Still refundable</dt>
+            <dd>{bhd(Math.max(0, txn.capturedFils - txn.refundedFils))}</dd>
+          </>
+        ) : null}
         <dt>Currency</dt>
         <dd>{txn.currency}</dd>
         <dt>Reference</dt>
@@ -232,7 +247,15 @@ export function TransactionDetailPage() {
         ) : null}
       </RequireRole>
 
-      <RefundDrawer txn={txn} onRefunded={load} />
+      {notice ? <p className="dash-notice" role="status">{notice}</p> : null}
+
+      <RefundDrawer
+        txn={txn}
+        onRefunded={async (message) => {
+          setNotice(message);
+          await load();
+        }}
+      />
 
       <h2>Event timeline</h2>
       <table className="dash-table">
@@ -253,7 +276,7 @@ export function TransactionDetailPage() {
               <td>{EVENT_LABELS[event.eventType] ?? event.eventType}</td>
               <td>{event.amountFils === null ? "—" : bhd(event.amountFils)}</td>
               <td>
-                {event.actorType}
+                {ACTOR_LABELS[event.actorType] ?? event.actorType}
                 {event.actorId ? (
                   <div className="dash-muted">
                     <code>{event.actorId}</code>
