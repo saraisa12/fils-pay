@@ -263,9 +263,15 @@ func handleRunBatch(pool *pgxpool.Pool) http.Handler {
 
 // handleRebuildBalances backs the admin console's "Rebuild cached balances"
 // action. Takes no body; any body sent is ignored.
+//
+// B060: rebuilds from the ledger, exactly like the `settlement
+// rebuild-balances` CLI (docs/HANDOVER.md: balances are rebuilt only from the
+// ledger). It used RefreshBalanceCache, which reads merchant_payable_position
+// (closed batches' scheme-export lines only) and so overwrote every balance
+// with a number that ignores unsettled captures, credits and adjustments.
 func handleRebuildBalances(pool *pgxpool.Pool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		diffs, err := ledger.RefreshBalanceCache(r.Context(), pool)
+		diffs, err := ledger.RebuildAllBalances(r.Context(), pool)
 		if err != nil {
 			log.Printf("settlement internal api: rebuild-balances failed: %v", err)
 			writeJSON(w, http.StatusInternalServerError, errorResponse{Error: "rebuild_balances_failed"})
