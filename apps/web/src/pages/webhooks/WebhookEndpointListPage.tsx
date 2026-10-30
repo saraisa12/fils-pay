@@ -5,6 +5,7 @@ import {
   listWebhookEndpoints,
   updateWebhookEndpoint,
 } from "../../api/webhooks.js";
+import { ConfirmDialog } from "@filspay/ui";
 import { describeError } from "../../api/client.js";
 import { useDashboardAuth } from "../../auth/DashboardAuthContext.js";
 import { dateTime, statusLabel } from "../../format.js";
@@ -25,6 +26,7 @@ export function WebhookEndpointListPage() {
   const [endpoints, setEndpoints] = useState<WebhookEndpointDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [askDelete, setAskDelete] = useState<WebhookEndpointDto | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -65,14 +67,7 @@ export function WebhookEndpointListPage() {
   async function handleDelete(endpoint: WebhookEndpointDto): Promise<void> {
     if (!merchantId) return;
     // A hard delete — the endpoint row is gone, while its delivery log
-    // outlives it. Irreversible, so it asks first.
-    if (
-      !window.confirm(
-        `Delete ${endpoint.url}? This cannot be undone, and its secret cannot be recovered.`,
-      )
-    ) {
-      return;
-    }
+    // outlives it. Irreversible, so the page asks (ConfirmDialog) first.
     setBusyId(endpoint.id);
     setError(null);
     try {
@@ -88,6 +83,21 @@ export function WebhookEndpointListPage() {
   return (
     <section>
       <h1>Webhook endpoints</h1>
+
+      <ConfirmDialog
+        open={askDelete !== null}
+        title="Delete this webhook endpoint?"
+        confirmLabel="Delete endpoint"
+        busy={busyId !== null}
+        onCancel={() => setAskDelete(null)}
+        onConfirm={() => {
+          const target = askDelete;
+          setAskDelete(null);
+          if (target) void handleDelete(target);
+        }}
+      >
+        <code>{askDelete?.url}</code> will be removed. This cannot be undone, and its secret cannot be recovered.
+      </ConfirmDialog>
 
       <p>
         <Link className="dash-button-link" to="/dashboard/webhooks/new">
@@ -133,7 +143,7 @@ export function WebhookEndpointListPage() {
                   type="button"
                   className="dash-button dash-danger"
                   disabled={busyId === endpoint.id}
-                  onClick={() => void handleDelete(endpoint)}
+                  onClick={() => setAskDelete(endpoint)}
                 >
                   Delete
                 </button>

@@ -1,4 +1,5 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
+import { NotFoundPage, RouteErrorPage } from "@filspay/ui";
 import { AdminLayout } from "./components/AdminLayout.js";
 import { RequireAdminAuth } from "./components/RequireAdminAuth.js";
 import { AdjustmentImportPage } from "./pages/adjustments/AdjustmentImportPage.js";
@@ -11,6 +12,9 @@ import { WebhookReplayPage } from "./pages/webhooks/WebhookReplayPage.js";
 
 // MK: /v2 routes live behind VITE_ADMIN_V2 — see the admin v2 doc
 export const router = createBrowserRouter([
+  {
+    errorElement: <RouteErrorPage homeTo="/merchants" homeLabel="Go to merchants" />,
+    children: [
   { path: "/login", element: <LoginPage /> },
   {
     // Everything below the login screen shares one shell and one guard. The
@@ -32,4 +36,7 @@ export const router = createBrowserRouter([
       { path: "/webhooks/:merchantId", element: <WebhookReplayPage /> },
     ],
   },
+    ],
+  },
+  { path: "*", element: <NotFoundPage homeTo="/merchants" homeLabel="Go to merchants" /> },
 ]);

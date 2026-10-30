@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { ConfirmDialog, useToast } from "@filspay/ui";
 import { Link, useParams } from "react-router-dom";
 import { cancelPaymentLink, listPaymentLinks } from "../../api/paymentLinks.js";
 import { describeError } from "../../api/client.js";
@@ -38,7 +39,9 @@ export function PaymentLinkDetailPage() {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [actionError, setActionError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const toast = useToast();
   const [submitting, setSubmitting] = useState(false);
+  const [askCancel, setAskCancel] = useState(false);
 
   const load = useCallback(async () => {
     if (!merchantId || !id) return;
@@ -57,7 +60,6 @@ export function PaymentLinkDetailPage() {
 
   async function handleCancel(): Promise<void> {
     if (!merchantId || !id) return;
-    if (!window.confirm("Cancel this payment link? It can no longer be paid.")) return;
     setSubmitting(true);
     setActionError(null);
     try {
@@ -76,10 +78,12 @@ export function PaymentLinkDetailPage() {
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
+      toast.success("Payment link copied");
     } catch {
       // No clipboard permission (or no secure context) — the URL is already
       // on screen and selectable, so there is nothing to recover from.
       setCopied(false);
+      toast.error("Could not copy. Select the link and copy it manually.");
     }
   }
 
@@ -159,13 +163,28 @@ export function PaymentLinkDetailPage() {
 
       {actionError ? <p className="dash-error">{actionError}</p> : null}
 
+      <ConfirmDialog
+        open={askCancel}
+        title="Cancel this payment link?"
+        confirmLabel="Cancel payment link"
+        cancelLabel="Keep link"
+        busy={submitting}
+        onCancel={() => setAskCancel(false)}
+        onConfirm={() => {
+          setAskCancel(false);
+          void handleCancel();
+        }}
+      >
+        It can no longer be paid. This cannot be undone.
+      </ConfirmDialog>
+
       {link.status === "active" ? (
         <RequireRole allow={["owner", "finance"]}>
           <button
             type="button"
             className="dash-button dash-danger"
             disabled={submitting}
-            onClick={() => void handleCancel()}
+            onClick={() => setAskCancel(true)}
           >
             {submitting ? "Canceling..." : "Cancel payment link"}
           </button>

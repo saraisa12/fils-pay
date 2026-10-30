@@ -1,4 +1,5 @@
 import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
+import { NotFoundPage, RouteErrorPage } from "@filspay/ui";
 import { CheckoutPage } from "./pages/checkout/CheckoutPage.js";
 import { DashboardAuthProvider } from "./auth/DashboardAuthContext.js";
 import { RequireDashboardAuth } from "./auth/RequireDashboardAuth.js";
@@ -20,6 +21,12 @@ import { OverviewPage } from "./pages/overview/OverviewPage.js";
 
 // MK: /refunds route removed until FP-212
 export const router = createBrowserRouter([
+  {
+    // Unexpected render/loader errors show a FilsPay page, not the router's
+    // developer error screen.
+    errorElement: <RouteErrorPage homeTo="/dashboard" homeLabel="Go to dashboard" />,
+    children: [
+  { path: "/", element: <Navigate to="/dashboard" replace /> },
   { path: "/pay/:token", element: <CheckoutPage /> },
 
   {
@@ -101,4 +108,7 @@ export const router = createBrowserRouter([
       },
     ],
   },
+    ],
+  },
+  { path: "*", element: <NotFoundPage homeTo="/dashboard" homeLabel="Go to dashboard" /> },
 ]);
