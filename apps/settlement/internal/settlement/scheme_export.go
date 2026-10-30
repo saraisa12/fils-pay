@@ -24,8 +24,17 @@ func TruncateToSchemeAmount(grossFils money.Fils) money.Fils {
 	return (grossFils / 10) * 10
 }
 
+// SchemeAmountText is the exact two-decimal BD text of an already-truncated
+// (multiple of 10 fils) amount, e.g. 4740 -> "4.74". scheme_export_lines.amount
+// is stored from this, not from a float: float64(4747)/1000 rounds to 4.75 in
+// numeric(10,2), which is MORE than the 4740 fils the ledger journals, so the
+// scheme statement was always a few fils above ours and never below.
+func SchemeAmountText(truncatedFils money.Fils) string {
+	return formatFilsAsTwoDecimalString(truncatedFils)
+}
+
 // SchemeAmountBD converts a transaction's gross fils to the BD value stored
-// in scheme_export_lines.amount (numeric(10,2)).
+// (rounded, as a float). Kept for compatibility; CloseBatch stores SchemeAmountText.
 func SchemeAmountBD(grossFils money.Fils) float64 {
 	return float64(grossFils) / 1000.0
 }

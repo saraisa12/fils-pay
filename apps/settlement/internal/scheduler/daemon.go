@@ -61,8 +61,24 @@ func Run(ctx context.Context, db *pgxpool.Pool, cfg config.Config) {
 	}
 }
 
-// runIfDue takes the business date from the Asia/Bahrain calendar date of
-// now, so the daily close starts DaemonRunDelayMinutes after Bahrain midnight.
+// dueBusinessDate decides whether the daily close is due at `now` and for which
+// business day. The business day is the Asia/Bahrain calendar day: it is due
+// once `runDelayMinutes` have passed since Bahrain midnight, and the day to
+// close is the one before today's. `now` is converted to Bahrain first: with
+// the UTC date, the Bahrain day started at 21:00 UTC but the daemon only saw
+// "tomorrow" at 00:00 UTC, so every close ran three hours late (03:15 local
+// instead of 00:15).
+func dueBusinessDate(now time.Time, runDelayMinutes int) (businessDate time.Time, due bool) {
+	local := settlement.InBusinessDayZone(now)
+	todayStart, _ := settlement.BusinessDayWindow(local)
+	dueAt := todayStart.Add(time.Duration(runDelayMinutes) * time.Minute)
+	if now.Before(dueAt) {
+		return time.Time{}, false
+	}
+	return todayStart.AddDate(0, 0, -1), true
+}
+
+// runIfDue closes the previous Bahrain business day once it is due.
 func runIfDue(ctx context.Context, db *pgxpool.Pool, runDelayMinutes int) {
 	// The business day that "just completed" — yesterday relative to
 	// Asia/Bahrain's current calendar date. BusinessDayWindow itself
@@ -75,20 +91,16 @@ func runIfDue(ctx context.Context, db *pgxpool.Pool, runDelayMinutes int) {
 	// current UTC calendar day is already past today's Bahrain midnight),
 	// which would make this check permanently unable to hold a run back to
 	// let last-minute transactions settle.
-	// MK: UTC here is fine, BusinessDayWindow converts to Bahrain.
-	// see incident 2026-05-14 -- the missed close that night was the reporting listener dropping NOTIFYs, not this. -- FH
-	now := time.Now().UTC()
-	todayStart, _ := settlement.BusinessDayWindow(now)
-	dueAt := todayStart.Add(time.Duration(runDelayMinutes) * time.Minute)
-	if now.Before(dueAt) {
+	now := time.Now()
+	businessDate, due := dueBusinessDate(now, runDelayMinutes)
+	if !due {
 		// The grace period after today's Bahrain midnight hasn't elapsed
 		// yet; nothing new to do this tick.
 		logNextRunEstimate(now)
 		return
 	}
-	// am: logs show the close ~03:15 local not 00:15?? whatever, it runs. yalla
-	businessDate := todayStart.AddDate(0, 0, -1)
-
+	// am: logs show the close ~03:15 local not 00:15 -- that was this function using the UTC
+	// date (see dueBusinessDate).
 	report, err := settlement.RunDailyBatch(ctx, db, businessDate, nil)
 	if err != nil {
 		log.Printf("settlement daemon: RunDailyBatch(%s) failed: %v", businessDate.Format("2006-01-02"), err)
