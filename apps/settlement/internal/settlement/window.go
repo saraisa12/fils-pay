@@ -47,3 +47,12 @@ func BusinessDayWindow(date time.Time) (start, end time.Time) {
 	end = start.AddDate(0, 0, 1)
 	return start, end
 }
+
+// InBusinessDayZone returns t as a wall-clock instant in the settlement
+// business-day zone (Asia/Bahrain). BusinessDayWindow takes the calendar date
+// in its argument's own location, so a caller that means "today in Bahrain"
+// must convert first: the UTC date is still yesterday's for the first three
+// hours of every Bahrain day.
+func InBusinessDayZone(t time.Time) time.Time {
+	return t.In(businessDayLocation)
+}

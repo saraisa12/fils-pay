@@ -46,8 +46,10 @@ type batchRow struct {
 	feeReversedFils money.Fils
 }
 
-// RecalculateMDR re-derives the fee on a merchant's closed batches in
-// [from, to) at the merchant's current terms and posts the difference.
+// RecalculateMDR re-derives the fee on a merchant's closed, NOT YET PAID batches in
+// [from, to) at the merchant's current terms and posts the difference. A paid batch
+// is final: its payout already left the platform, so changing its figures afterwards
+// would make the batch, the bank instruction and the statement disagree.
 func RecalculateMDR(ctx context.Context, db *pgxpool.Pool, merchantID uuid.UUID, from, to time.Time) (RecalcResult, error) {
 	tx, err := db.Begin(ctx)
 	if err != nil {
@@ -66,7 +68,7 @@ func RecalculateMDR(ctx context.Context, db *pgxpool.Pool, merchantID uuid.UUID,
 		SELECT id, batch_date, status, gross_fils, fee_fils, net_payout_fils, refund_fils, fee_reversed_fils
 		  FROM settlement_batches
 		 WHERE merchant_id = $1 AND batch_date >= $2 AND batch_date < $3
-		   AND status <> 'open'
+		   AND status = 'closed'
 		 ORDER BY batch_date
 		 FOR UPDATE
 	`, merchantID, from, to)
