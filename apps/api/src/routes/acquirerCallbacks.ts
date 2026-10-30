@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { BadRequestError, UnauthorizedError } from "../lib/errors.js";
+import { UUID_RE } from "../admin/merchants.js";
 import { verifyAcquirerCallbackSignature } from "../webhooks/inboundVerify.js";
 import { applyAcquirerCallback, withCallbackRetry, type AcquirerCallbackInput } from "../acquirer/callbacks.js";
 
@@ -7,9 +8,8 @@ import { applyAcquirerCallback, withCallbackRetry, type AcquirerCallbackInput } 
 const ACQUIRER_SIGNATURE_HEADER = "acquirer-callback-signature";
 
 /**
- * Body of a fraud_review.completed callback. `outcome` is validated against
- * the AcquirerCallbackInput union ("approved" | "rejected") before it is
- * applied; any other value is a 400.
+ * Body of a fraud_review.completed callback. `outcome` must be "cleared" or
+ * "confirmed_fraud" (the AcquirerCallbackInput union); anything else is a 400.
  */
 interface AcquirerCallbackBody {
   callbackId?: string;
@@ -18,6 +18,15 @@ interface AcquirerCallbackBody {
   occurredAt?: string;
   outcome?: string;
   note?: string;
+}
+
+const OUTCOMES = ["cleared", "confirmed_fraud"] as const;
+
+declare module "fastify" {
+  interface FastifyRequest {
+    /** The callback's exact bytes, kept because the acquirer's HMAC is over them. */
+    rawBody?: string;
+  }
 }
 
 /** Header format: "t=<unix seconds>,v1=<hex hmac>". A repeated header uses the first value. */
@@ -38,6 +47,17 @@ function getSignatureHeader(request: FastifyRequest): string | undefined {
  * endpoint has.
  */
 export async function acquirerCallbackRoutes(app: FastifyInstance): Promise<void> {
+  // The signature covers the raw body, so this scope keeps the original bytes next to the parsed
+  // object. (Only this plugin's routes: the parser is encapsulated.)
+  app.addContentTypeParser("application/json", { parseAs: "string" }, (request, body, done) => {
+    request.rawBody = body as string;
+    try {
+      done(null, (body as string).length > 0 ? JSON.parse(body as string) : {});
+    } catch {
+      done(new BadRequestError("invalid_json", "the request body is not valid JSON"), undefined);
+    }
+  });
+
   app.post<{ Body: AcquirerCallbackBody }>("/callbacks", async (request, reply) => {
     const body = request.body ?? {};
     if (
@@ -54,11 +74,22 @@ export async function acquirerCallbackRoutes(app: FastifyInstance): Promise<void
       );
     }
 
+    if (!UUID_RE.test(body.transactionId)) {
+      throw new BadRequestError("invalid_request", "transactionId must be a transaction id");
+    }
+    if (!(OUTCOMES as readonly string[]).includes(body.outcome)) {
+      throw new BadRequestError("invalid_request", `outcome must be one of ${OUTCOMES.join(", ")}`);
+    }
+    if (Number.isNaN(new Date(body.occurredAt).getTime())) {
+      throw new BadRequestError("invalid_request", "occurredAt must be an ISO-8601 timestamp");
+    }
+
     const verification = verifyAcquirerCallbackSignature(
-      body,
+      request.rawBody ?? JSON.stringify(body),
       getSignatureHeader(request),
       app.config.acquirerCallbackSigningSecret,
       app.config.acquirerCallbackRequireSignature,
+      { toleranceSeconds: app.config.acquirerCallbackToleranceSeconds },
     );
     if (!verification.valid) {
       throw new UnauthorizedError("invalid_signature", verification.reason);

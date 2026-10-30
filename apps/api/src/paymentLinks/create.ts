@@ -1,15 +1,13 @@
 import type { Pool } from "pg";
 import { toFils } from "@filspay/money";
 import { BadRequestError } from "../lib/errors.js";
-import { randomFromAlphabet } from "../lib/random.js";
+import { randomBytes } from "node:crypto";
 import { serializePaymentLink, type PaymentLinkDto, type PaymentLinkRow } from "./serialize.js";
 
-const TOKEN_ALPHABET =
-  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-
-/** 22-char URL-safe token for payment link URLs. */
+/** 22-char URL-safe token (128 bits) from crypto.randomBytes. A payment link token is the only thing
+ *  standing between the public and "pay this merchant's invoice", so it must not be guessable. */
 function randomPlinkToken(): string {
-  return randomFromAlphabet(TOKEN_ALPHABET, 22);
+  return randomBytes(16).toString("base64url");
 }
 
 export interface CreatePaymentLinkInput {

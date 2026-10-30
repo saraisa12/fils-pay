@@ -3,6 +3,7 @@ import type { Config } from "../config.js";
 import { randomToken } from "../lib/crypto.js";
 import { BadRequestError } from "../lib/errors.js";
 import { decodeEncryptionKey, encryptSecret } from "./secretCrypto.js";
+import { isInternalHostname, isPrivateAddress } from "./ssrf.js";
 
 /**
  * Validates a webhook endpoint URL: must parse as an absolute URL with
@@ -10,8 +11,10 @@ import { decodeEncryptionKey, encryptSecret } from "./secretCrypto.js";
  * (http is permitted otherwise so a local http.createServer test receiver
  * and a merchant's own localhost dev setup both work).
  */
-// MK: https-only in prod is our SSRF protection
-// used to block localhost in dev too, removed for the local receiver — am
+// In production the host must also be a public one: https alone does not stop https://localhost/,
+// https://169.254.169.254/ (cloud metadata) or our own internal services. (Dev and test keep
+// allowing localhost for local receivers.) Names are re-checked after DNS resolution when the
+// webhook is actually sent, see transport.ts.
 export function validateWebhookUrl(rawUrl: string, config: Pick<Config, "nodeEnv">): URL {
   let parsed: URL;
   try {
@@ -22,8 +25,17 @@ export function validateWebhookUrl(rawUrl: string, config: Pick<Config, "nodeEnv
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
     throw new BadRequestError("invalid_url");
   }
-  if (config.nodeEnv === "production" && parsed.protocol !== "https:") {
-    throw new BadRequestError("invalid_url");
+  if (config.nodeEnv === "production") {
+    if (parsed.protocol !== "https:") {
+      throw new BadRequestError("invalid_url");
+    }
+    if (parsed.username !== "" || parsed.password !== "") {
+      throw new BadRequestError("invalid_url", "credentials in the URL are not allowed");
+    }
+    const host = parsed.hostname.replace(/^\[|\]$/g, "");
+    if (isPrivateAddress(host) || isInternalHostname(host)) {
+      throw new BadRequestError("invalid_url", "the webhook URL must point at a public address");
+    }
   }
   return parsed;
 }

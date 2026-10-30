@@ -17,7 +17,9 @@ interface TransactionMerchantRow {
 
 /**
  * Applies one acquirer callback: looks up the transaction it refers to and
- * appends a note recording the acquirer's own delayed verdict.
+ * appends a note recording the acquirer's own delayed verdict. The acquirer redelivers
+ * (at-least-once), so a callback already stored for this transaction is a no-op: one note per
+ * (transaction, callbackId), however many times it arrives.
  * acquirer_callback_notes is append-only and surfaced on the transaction
  * timeline for support/finance to read — a fraud-review verdict is
  * informational, not a state transition, so this never touches
@@ -37,7 +39,8 @@ export async function applyAcquirerCallback(pool: Pool, callback: AcquirerCallba
   await pool.query(
     `INSERT INTO acquirer_callback_notes
         (transaction_id, merchant_id, callback_id, callback_type, outcome, note, received_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     ON CONFLICT (transaction_id, callback_id) DO NOTHING`,
     [
       callback.transactionId,
       txnRow.merchant_id,
