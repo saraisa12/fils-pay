@@ -13,9 +13,20 @@ import { pathToFileURL } from "node:url";
 import { Client } from "pg";
 import { formatBhd, toFils } from "@filspay/money";
 
+/** B078: a business month runs from Bahrain midnight to Bahrain midnight
+ *  (Asia/Bahrain is UTC+3 all year, no daylight saving), not UTC midnight.
+ *  With UTC bounds the first 3 hours of the month were left out and the
+ *  first 3 hours of the next month were swept in. */
+const BAHRAIN_OFFSET_MS = 3 * 60 * 60 * 1000;
 export function monthBounds(year: number, month: number): { start: Date; end: Date } {
-  return { start: new Date(Date.UTC(year, month - 1, 1)), end: new Date(Date.UTC(year, month, 1)) };
+  return {
+    start: new Date(Date.UTC(year, month - 1, 1) - BAHRAIN_OFFSET_MS),
+    end: new Date(Date.UTC(year, month, 1) - BAHRAIN_OFFSET_MS),
+  };
 }
+
+/** Same description on every row the sweep writes, so a second run can see the first. */
+export const SWEEP_DESCRIPTION = "March 2026 scheme rounding residue sweep — manual recon per finance";
 
 export interface ResidueRow {
   merchantId: string;
@@ -68,11 +79,10 @@ function groupByMerchant(rows: ResidueRow[]): MerchantResidue[] {
   return [...byMerchant.values()];
 }
 
-// am: re-running is safe, entry_group_id dedupes it
 async function postResidueCorrection(client: Client, merchant: MerchantResidue, now: Date): Promise<void> {
   if (merchant.residueFils <= 0) return;
   const entryGroupId = randomUUID();
-  const description = "March 2026 scheme rounding residue sweep — manual recon per finance";
+  const description = SWEEP_DESCRIPTION;
   await client.query(
     `INSERT INTO ledger_entries (entry_group_id, merchant_id, account_id, direction, amount_fils, occurred_at, description)
      VALUES ($1, $2, 'merchant_payable', 'debit', $3, $4, $5),
@@ -105,6 +115,16 @@ async function main(): Promise<void> {
 
     await client.query("BEGIN");
     try {
+      // B078: re-running must not post the sweep twice. Each run made a fresh
+      // entry_group_id, so nothing stopped a second run (finance memo: "ran
+      // twice"). Lock out concurrent runs, then refuse if any sweep row exists.
+      await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [SWEEP_DESCRIPTION]);
+      const already = await client.query(`SELECT 1 FROM ledger_entries WHERE description = $1 LIMIT 1`, [
+        SWEEP_DESCRIPTION,
+      ]);
+      if (already.rowCount) {
+        throw new Error("reconcile_march: the March 2026 sweep has already been posted; refusing to post it again");
+      }
       for (const merchant of merchantResidues) {
         await postResidueCorrection(client, merchant, now);
         console.log(
