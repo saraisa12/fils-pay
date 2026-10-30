@@ -5,4 +5,5 @@ dist/
 .env.local
 npm-debug.log*
 .DS_Store
-.claude/
+# Claude Code: commit the shared commands, keep personal local settings out
+.claude/settings.local.json
