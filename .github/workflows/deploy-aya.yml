@@ -18,23 +18,25 @@ jobs:
       - name: Configure SSH
         env:
           SSH_KEY: ${{ secrets.AYA_DEPLOY_SSH_KEY }}
-          SSH_HOST: ${{ secrets.AYA_DEPLOY_HOST }}
-          SSH_USER: ${{ secrets.AYA_DEPLOY_USER }}
+          KNOWN_HOSTS: ${{ secrets.AYA_SSH_KNOWN_HOSTS }}
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
+
           printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
 
-          # Verify the server host key using a trusted fingerprint
-          # before enabling the SSH connection.
-          echo "SSH key configured"
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
 
-      - name: Deploy FilsPay
+      - name: Deploy FilsPay to DigitalOcean
         env:
           SSH_HOST: ${{ secrets.AYA_DEPLOY_HOST }}
           SSH_USER: ${{ secrets.AYA_DEPLOY_USER }}
         run: |
-          ssh -o StrictHostKeyChecking=yes \
+          ssh \
+            -i ~/.ssh/id_ed25519 \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
             "$SSH_USER@$SSH_HOST" \
             '/home/dilmune/deploy.sh'
