@@ -1,12 +1,14 @@
 # Image for api, reporting, migrate and seed (README: node:20, full install).
 # Built from the repo root: `docker compose -f ops/docker-compose.yml build`.
-FROM node:20-bookworm-slim
+FROM node:20-bookworm
 
 WORKDIR /app
 
 # Install from the lockfile first so the dependency layer is cached when only
 # source changes. Native modules (argon2, sharp) ship prebuilt binaries for
-# glibc, which is why this is bookworm-slim and not alpine.
+# glibc, which is why this is bookworm and not alpine. The full image (not
+# -slim) is needed: when a prebuilt binary does not match, argon2 compiles
+# from source with node-gyp, which needs python3 and a C++ toolchain.
 COPY package.json package-lock.json tsconfig.base.json tsconfig.json ./
 COPY packages ./packages
 COPY apps ./apps
