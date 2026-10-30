@@ -1,55 +1,130 @@
+/* Checkout: the page a customer pays on. Scoped to .checkout-* only.
+   Same accent as the dashboard so a merchant's brand-neutral checkout and
+   their FilsPay dashboard feel like one product. */
 .checkout-page {
+  --checkout-accent: #0f6b55;
+  --checkout-accent-hover: #0b5644;
+  --checkout-accent-tint: #e7f2ee;
+  --checkout-line: #d7ddd9;
+  --checkout-muted: #5b6460;
+  --checkout-danger: #b42318;
+  --checkout-danger-tint: #fef3f2;
+
+  box-sizing: border-box;
   max-width: 420px;
   margin: 2rem auto;
   padding: 1.5rem;
-  font-family: system-ui, sans-serif;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: #1a1a1a;
+}
+
+.checkout-page *,
+.checkout-page *::before,
+.checkout-page *::after {
+  box-sizing: border-box;
+}
+
+/* "What you are paying": one block, so the merchant, amount and invoice are
+   checked together before the card details. */
+.checkout-summary {
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--checkout-line);
+  border-radius: 8px;
+  background: var(--checkout-accent-tint);
+}
+
+.checkout-merchant {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--checkout-muted);
 }
 
 .checkout-amount {
   font-size: 2rem;
-  font-weight: 600;
-  margin: 0.5rem 0;
+  font-weight: 700;
+  margin: 0.25rem 0;
+  font-variant-numeric: tabular-nums;
 }
 
 .checkout-description,
 .checkout-reference {
-  color: #555;
-  margin: 0.25rem 0;
+  color: var(--checkout-muted);
+  margin: 0.15rem 0;
 }
 
+/* Errors look like errors, not plain red text that's easy to miss. */
 .checkout-error {
-  color: #b00020;
-  margin: 1rem 0;
+  margin: 1rem 0 0;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--checkout-danger);
+  border-radius: 6px;
+  background: var(--checkout-danger-tint);
+  color: var(--checkout-danger);
 }
 
 .checkout-form {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.9rem;
   margin-top: 1.5rem;
 }
 
 .checkout-form label {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.3rem;
   font-size: 0.875rem;
+  font-weight: 500;
+  min-width: 0;
 }
 
 .checkout-form input {
-  padding: 0.5rem;
+  width: 100%;
+  min-width: 0;
+  padding: 0.6rem 0.7rem;
+  font: inherit;
   font-size: 1rem;
+  border: 1px solid #b9c1bc;
+  border-radius: 6px;
+  background: #fff;
 }
 
+.checkout-form input:focus-visible {
+  outline: 2px solid var(--checkout-accent);
+  outline-offset: 1px;
+  border-color: var(--checkout-accent);
+}
+
+/* Month, year and CVV share one row that always fits the screen, and the
+   boxes line up even when a label wraps to two lines. */
 .checkout-form-row {
-  display: flex;
-  gap: 0.5rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.6rem;
+  align-items: end;
 }
 
+/* The one action on the page: filled, so it never looks disabled. */
 .checkout-form button {
-  padding: 0.75rem;
+  padding: 0.85rem;
+  font: inherit;
   font-size: 1rem;
+  font-weight: 600;
   cursor: pointer;
+  border: 1px solid var(--checkout-accent);
+  border-radius: 6px;
+  background: var(--checkout-accent);
+  color: #fff;
+}
+
+.checkout-form button:hover:not(:disabled) {
+  background: var(--checkout-accent-hover);
+}
+
+.checkout-form button:focus-visible {
+  outline: 2px solid var(--checkout-accent);
+  outline-offset: 2px;
 }
 
 .checkout-form button:disabled {
@@ -62,11 +137,31 @@
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #555;
+  color: var(--checkout-muted);
 }
 
 .checkout-help {
   margin-top: 1.5rem;
   font-size: 0.75rem;
   color: #777;
+}
+
+/* Receipt after paying: label above value, readable on a phone. */
+.checkout-receipt {
+  display: grid;
+  gap: 0.15rem;
+  margin: 1.25rem 0 0;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--checkout-line);
+  border-radius: 8px;
+}
+
+.checkout-receipt dt {
+  font-size: 0.8rem;
+  color: var(--checkout-muted);
+}
+
+.checkout-receipt dd {
+  margin: 0 0 0.6rem;
+  overflow-wrap: anywhere;
 }

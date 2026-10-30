@@ -110,13 +110,25 @@ export function CheckoutPage() {
     return (
       <main className="checkout-page">
         <h1>Payment successful</h1>
-        <p>Thank you — your payment has been received.</p>
-        <dl>
+        <p>
+          You paid <strong>{formatBhd(toFils(payState.result.amountFils))} BHD</strong> to{" "}
+          <strong>{link.merchantDisplayName}</strong>.
+        </p>
+        <dl className="checkout-receipt">
+          {link.reference ? (
+            <>
+              <dt>Reference</dt>
+              <dd>{link.reference}</dd>
+            </>
+          ) : null}
+          <dt>Paid on</dt>
+          <dd>{new Date(payState.result.paidAt).toLocaleString()}</dd>
           <dt>Transaction ID</dt>
-          <dd>{payState.result.transactionId}</dd>
-          <dt>Paid at</dt>
-          <dd>{payState.result.paidAt}</dd>
+          <dd>
+            <code>{payState.result.transactionId}</code>
+          </dd>
         </dl>
+        <p className="checkout-help">Keep this page or the transaction ID for your records.</p>
       </main>
     );
   }
@@ -169,10 +181,12 @@ export function CheckoutPage() {
 
   return (
     <main className="checkout-page">
-      <h1>{link.merchantDisplayName}</h1>
-      <p className="checkout-amount">{amount} BHD</p>
-      {link.description ? <p className="checkout-description">{link.description}</p> : null}
-      {link.reference ? <p className="checkout-reference">Reference: {link.reference}</p> : null}
+      <section className="checkout-summary" aria-label="What you are paying">
+        <h1 className="checkout-merchant">{link.merchantDisplayName}</h1>
+        <p className="checkout-amount">{amount} BHD</p>
+        {link.description ? <p className="checkout-description">{link.description}</p> : null}
+        {link.reference ? <p className="checkout-reference">Reference: {link.reference}</p> : null}
+      </section>
 
       {payState.kind === "declined" ? <p className="checkout-error">{payState.message}</p> : null}
 
@@ -182,6 +196,7 @@ export function CheckoutPage() {
           <input
             type="text"
             inputMode="numeric"
+            autoComplete="cc-number"
             required
             value={card.pan}
             onChange={(e) => {
@@ -208,6 +223,7 @@ export function CheckoutPage() {
               type="number"
               min={1}
               max={12}
+              autoComplete="cc-exp-month"
               required
               value={card.expiryMonth}
               onChange={(e) => setCard({ ...card, expiryMonth: Number(e.target.value) })}
@@ -218,6 +234,7 @@ export function CheckoutPage() {
             <input
               type="number"
               min={new Date().getFullYear()}
+              autoComplete="cc-exp-year"
               required
               value={card.expiryYear}
               onChange={(e) => setCard({ ...card, expiryYear: Number(e.target.value) })}
@@ -228,6 +245,7 @@ export function CheckoutPage() {
             <input
               type="text"
               inputMode="numeric"
+              autoComplete="cc-csc"
               required
               value={card.cvv}
               onChange={(e) => setCard({ ...card, cvv: e.target.value })}

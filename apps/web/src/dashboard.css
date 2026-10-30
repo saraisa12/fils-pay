@@ -270,7 +270,6 @@
   color: #7a0016;
 }
 
-.dash-status-refunded,
 .dash-status-closed {
   color: #34495e;
 }
@@ -312,4 +311,119 @@
   height: 0.7rem;
   min-width: 1px;
   background: #4a7ebb;
+}
+
+/* Phones: a wide table scrolls sideways inside its own box instead of
+   stretching the whole page past the screen edge, and rows stay one line
+   tall instead of wrapping every cell into 3-4 lines. */
+@media (max-width: 640px) {
+  .dash-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}
+
+/* Amount columns: right-aligned with equal-width digits, so the decimal
+   points line up and amounts can be compared down a column at a glance. */
+.dash-table .dash-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Phones: each label sits above its value instead of a fixed-width label
+   column that pushes the values past the screen edge. */
+@media (max-width: 640px) {
+  .dash-dl {
+    grid-template-columns: 1fr;
+  }
+  .dash-dl dd {
+    margin-bottom: 0.5rem;
+    overflow-wrap: anywhere;
+  }
+}
+
+/* ---- Design pass ----
+   One accent colour, a clear button hierarchy, statuses as pills, and
+   tables that are easier to follow. Scoped to the dashboard and its login
+   (.dash-shell, .dash-centered), never the checkout page. */
+.dash-shell,
+.dash-centered {
+  --dash-accent: #0f6b55;
+  --dash-accent-hover: #0b5644;
+  --dash-accent-tint: #e7f2ee;
+  --dash-danger: #b42318;
+  --dash-danger-tint: #fef3f2;
+  --dash-head: #f1f4f2;
+}
+
+/* Links in one colour (no browser blue next to visited purple). */
+.dash-shell a,
+.dash-centered a {
+  color: var(--dash-accent);
+}
+
+/* Menu stays dark; only the current page is in the accent colour. */
+.dash-shell .dash-nav a {
+  color: #1a1a1a;
+}
+
+.dash-shell .dash-nav a.active {
+  color: var(--dash-accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.4em;
+}
+
+/* Main action of a form: filled, so it is the obvious next step. */
+.dash-button[type="submit"],
+.dash-button.dash-primary {
+  background: var(--dash-accent);
+  border-color: var(--dash-accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.dash-button[type="submit"]:hover:not(:disabled),
+.dash-button.dash-primary:hover:not(:disabled) {
+  background: var(--dash-accent-hover);
+}
+
+/* Irreversible actions (void, refund, cancel, delete): red, so they never
+   look like the safe button next to them. */
+.dash-button.dash-danger {
+  background: #fff;
+  border-color: var(--dash-danger);
+  color: var(--dash-danger);
+  font-weight: 600;
+}
+
+.dash-button.dash-danger:hover:not(:disabled) {
+  background: var(--dash-danger-tint);
+}
+
+/* Visible keyboard focus everywhere. */
+.dash-shell :is(a, .dash-button, .dash-button-link, input, select, textarea):focus-visible,
+.dash-centered :is(a, .dash-button, input, select, textarea):focus-visible {
+  outline: 2px solid var(--dash-accent);
+  outline-offset: 2px;
+}
+
+/* Tables: a tinted header row, and the row under the pointer highlighted so
+   a wide row is easy to follow from left to right. */
+.dash-table th {
+  background: var(--dash-head);
+}
+
+.dash-table tbody tr:hover td {
+  background: var(--dash-accent-tint);
+}
+
+/* Statuses as pills: colour plus shape, readable at a glance. */
+.dash-status {
+  display: inline-block;
+  padding: 0.05rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.85em;
+  white-space: nowrap;
+  background: color-mix(in srgb, currentColor 12%, transparent);
 }

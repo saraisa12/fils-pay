@@ -7,7 +7,7 @@ import {
 } from "../../api/webhooks.js";
 import { describeError } from "../../api/client.js";
 import { useDashboardAuth } from "../../auth/DashboardAuthContext.js";
-import { dateTime } from "../../format.js";
+import { dateTime, statusLabel } from "../../format.js";
 import type { WebhookEndpointDto } from "../../types.js";
 
 /**
@@ -117,7 +117,7 @@ export function WebhookEndpointListPage() {
                 <code>{endpoint.secretPrefix}</code>
               </td>
               <td>
-                <span className={`dash-status dash-status-${endpoint.status}`}>{endpoint.status}</span>
+                <span className={`dash-status dash-status-${endpoint.status}`}>{statusLabel(endpoint.status)}</span>
               </td>
               <td>{dateTime(endpoint.createdAt)}</td>
               <td>
@@ -131,7 +131,7 @@ export function WebhookEndpointListPage() {
                 </button>{" "}
                 <button
                   type="button"
-                  className="dash-button"
+                  className="dash-button dash-danger"
                   disabled={busyId === endpoint.id}
                   onClick={() => void handleDelete(endpoint)}
                 >

@@ -117,6 +117,8 @@ export function CreditsPage() {
           <button
             key={tab.value}
             type="button"
+            className="admin-tab"
+            aria-pressed={tab.value === status}
             disabled={tab.value === status}
             onClick={() => setStatus(tab.value)}
           >
@@ -175,14 +177,16 @@ export function CreditsPage() {
                       <button
                         type="button"
                         disabled={busyId === item.id}
-                        onClick={() => void handleApprove(item.id)}
+                        className="admin-primary"
+                  onClick={() => void handleApprove(item.id)}
                       >
                         Approve
                       </button>{" "}
                       <button
                         type="button"
                         disabled={busyId === item.id}
-                        onClick={() => setPendingReject(item.id)}
+                        className="admin-danger"
+                  onClick={() => setPendingReject(item.id)}
                       >
                         Reject
                       </button>
@@ -214,7 +218,8 @@ export function CreditsPage() {
           <button
             type="button"
             disabled={busyId === pendingReject}
-            onClick={() => void handleReject(pendingReject)}
+            className="admin-danger"
+                  onClick={() => void handleReject(pendingReject)}
           >
             Yes, reject it
           </button>{" "}
