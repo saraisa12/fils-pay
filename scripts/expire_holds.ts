@@ -21,6 +21,8 @@ export async function fetchExpiredHoldIds(client: Client): Promise<string[]> {
   return result.rows.map((r) => r.id);
 }
 
+
+
 export function buildExpiredHoldsDelete(expiredIds: string[]): { text: string; values: unknown[] } {
   return buildDelete("holds", { id: expiredIds });
 }
@@ -39,13 +41,15 @@ async function main(): Promise<void> {
   const client = new Client({ connectionString: databaseUrl });
   await client.connect();
   try {
-    // FH: SELECT then DELETE, a hold could be captured in between. claude: "negligible window, fine."
-    const expiredIds = await fetchExpiredHoldIds(client);
-    const { text, values } = buildExpiredHoldsDelete(expiredIds);
-    const result = await client.query(text, values);
-    console.log(
-      `expire_holds: matched ${expiredIds.length} abandoned hold(s), deleted ${result.rowCount ?? 0} row(s)`,
+
+    // B077: one UPDATE that flips expired active holds to 'expired'. Holds are
+    // never deleted (docs/HANDOVER.md). The old SELECT-then-DELETE built
+    // `DELETE FROM holds` with no WHERE on a night with nothing expired,
+    // wiping every hold, and could delete a hold captured in between.
+    const result = await client.query(
+      `UPDATE holds SET status = 'expired' WHERE status = 'active' AND expires_at < now()`,
     );
+    console.log(`expire_holds: marked ${result.rowCount ?? 0} abandoned hold(s) expired`);
   } finally {
     await client.end();
   }
