@@ -1,0 +1,23 @@
+# Image for api, reporting, migrate and seed (README: node:20, full install).
+# Built from the repo root: `docker compose -f ops/docker-compose.yml build`.
+FROM node:20-bookworm-slim
+
+WORKDIR /app
+
+# Install from the lockfile first so the dependency layer is cached when only
+# source changes. Native modules (argon2, sharp) ship prebuilt binaries for
+# glibc, which is why this is bookworm-slim and not alpine.
+COPY package.json package-lock.json tsconfig.base.json tsconfig.json ./
+COPY packages ./packages
+COPY apps ./apps
+COPY db ./db
+COPY scripts ./scripts
+RUN npm ci --no-audit --no-fund
+
+ENV NODE_ENV=production
+# KYC uploads land here; mount a volume on it to keep them across restarts.
+RUN mkdir -p /app/data/kyc && chown -R node:node /app/data
+USER node
+
+EXPOSE 3000
+CMD ["npx", "tsx", "apps/api/src/index.ts"]

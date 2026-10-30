@@ -37,15 +37,17 @@ func SchemeAmountBD(grossFils money.Fils) float64 {
 func buildBatchClosedPayload(
 	merchantID, batchID uuid.UUID,
 	batchDate time.Time,
-	grossFils, feeFils, netPayoutFils money.Fils,
+	grossFils, feeFils, netPayoutFils, refundFils, feeReversedFils money.Fils,
 ) ([]byte, error) {
 	payload := map[string]any{
-		"merchantId":    merchantID.String(),
-		"batchId":       batchID.String(),
-		"batchDate":     batchDate.Format("2006-01-02"),
-		"grossFils":     int64(grossFils),
-		"feeFils":       int64(feeFils),
-		"netPayoutFils": int64(netPayoutFils),
+		"merchantId":      merchantID.String(),
+		"batchId":         batchID.String(),
+		"batchDate":       batchDate.Format("2006-01-02"),
+		"grossFils":       int64(grossFils),
+		"feeFils":         int64(feeFils),
+		"netPayoutFils":   int64(netPayoutFils),
+		"refundFils":      int64(refundFils),
+		"feeReversedFils": int64(feeReversedFils),
 	}
 	encoded, err := json.Marshal(payload)
 	if err != nil {

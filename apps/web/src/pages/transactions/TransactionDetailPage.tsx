@@ -10,6 +10,16 @@ import { ApiError, describeError } from "../../api/client.js";
 import { RequireRole } from "../../auth/RequireRole.js";
 import { bhd, dash, dateTime } from "../../format.js";
 import type { TransactionDto, TransactionEventDto } from "../../types.js";
+import { RefundDrawer } from "./RefundDrawer.js";
+
+const EVENT_LABELS: Record<string, string> = {
+  authorized: "Authorized",
+  captured: "Captured",
+  partially_captured: "Partially captured",
+  voided: "Voided",
+  refunded: "Refunded (in full)",
+  refund_partial: "Partially refunded",
+};
 
 type LoadState =
   | { kind: "loading" }
@@ -26,8 +36,6 @@ type LoadState =
  * for both (a `403` would confirm a foreign transaction's existence), and
  * this page does not undo that by guessing.
  */
-// MK: timeline renders refund events fine
-// FH: RefundDrawer import removed 2026-06 until the route exists
 export function TransactionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [state, setState] = useState<LoadState>({ kind: "loading" });
@@ -151,6 +159,8 @@ export function TransactionDetailPage() {
         <dd>{bhd(txn.amountFils)}</dd>
         <dt>Captured amount</dt>
         <dd>{bhd(txn.capturedFils)}</dd>
+        <dt>Refunded amount</dt>
+        <dd>{bhd(txn.refundedFils)}</dd>
         <dt>Currency</dt>
         <dd>{txn.currency}</dd>
         <dt>Reference</dt>
@@ -222,6 +232,8 @@ export function TransactionDetailPage() {
         ) : null}
       </RequireRole>
 
+      <RefundDrawer txn={txn} onRefunded={load} />
+
       <h2>Event timeline</h2>
       <table className="dash-table">
         <thead>
@@ -238,7 +250,7 @@ export function TransactionDetailPage() {
           {events.map((event) => (
             <tr key={event.id}>
               <td>{dateTime(event.occurredAt)}</td>
-              <td>{event.eventType}</td>
+              <td>{EVENT_LABELS[event.eventType] ?? event.eventType}</td>
               <td>{event.amountFils === null ? "—" : bhd(event.amountFils)}</td>
               <td>
                 {event.actorType}

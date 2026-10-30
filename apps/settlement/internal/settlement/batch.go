@@ -31,6 +31,7 @@ type BatchResult struct {
 	GrossFils     money.Fils
 	FeeFils       money.Fils
 	NetPayoutFils money.Fils
+	RefundFils    money.Fils // refunds netted off this payout
 	EventCount    int
 	LineCount     int
 }
@@ -216,7 +217,15 @@ func CloseBatch(ctx context.Context, db *pgxpool.Pool, merchantID uuid.UUID, bus
 		batchGross += grossForTxn
 		batchFee += feeForTxn
 	}
-	netPayout := NetPayableFils(batchGross, batchFee)
+
+	// Refunds made since the last batch come off this payout. Claimed here, in
+	// the same transaction that freezes the totals, so a refund can never be
+	// netted into two batches.
+	refunds, err := claimRefundsForBatch(ctx, tx, merchantID, end, NetPayableFils(batchGross, batchFee))
+	if err != nil {
+		return BatchResult{}, fmt.Errorf("settlement: CloseBatch: claim refunds: %w", err)
+	}
+	netPayout := NetPayoutAfterRefundsFils(batchGross, batchFee, refunds.refundFils, refunds.feeReversedFils)
 
 	// Record this batch's contribution to the platform-wide lifetime
 	// processed-volume counter, in the same transaction that freezes this
@@ -229,9 +238,11 @@ func CloseBatch(ctx context.Context, db *pgxpool.Pool, merchantID uuid.UUID, bus
 	// Step 10: freeze the batch totals.
 	_, err = tx.Exec(ctx, `
 		UPDATE settlement_batches
-		   SET status = 'closed', gross_fils = $2, fee_fils = $3, net_payout_fils = $4, closed_at = now()
+		   SET status = 'closed', gross_fils = $2, fee_fils = $3, net_payout_fils = $4, closed_at = now(),
+		       refund_fils = $5, fee_reversed_fils = $6
 		 WHERE id = $1
-	`, batchID, int64(batchGross), int64(batchFee), int64(netPayout))
+	`, batchID, int64(batchGross), int64(batchFee), int64(netPayout),
+		int64(refunds.refundFils), int64(refunds.feeReversedFils))
 	if err != nil {
 		return BatchResult{}, fmt.Errorf("settlement: CloseBatch: freeze batch totals: %w", err)
 	}
@@ -244,6 +255,13 @@ func CloseBatch(ctx context.Context, db *pgxpool.Pool, merchantID uuid.UUID, bus
 		`, eventIDs, batchID)
 		if err != nil {
 			return BatchResult{}, fmt.Errorf("settlement: CloseBatch: mark events batched: %w", err)
+		}
+	}
+
+	if len(refunds.ids) > 0 {
+		_, err = tx.Exec(ctx, `UPDATE refunds SET settlement_batch_id = $2 WHERE id = ANY($1)`, refunds.ids, batchID)
+		if err != nil {
+			return BatchResult{}, fmt.Errorf("settlement: CloseBatch: mark refunds batched: %w", err)
 		}
 	}
 
@@ -260,7 +278,7 @@ func CloseBatch(ctx context.Context, db *pgxpool.Pool, merchantID uuid.UUID, bus
 
 	// Step 13: enqueue settlement.batch_closed onto the shared outbox, in
 	// the same transaction as the frozen totals.
-	payload, err := buildBatchClosedPayload(merchantID, batchID, batchDateOnly, batchGross, batchFee, netPayout)
+	payload, err := buildBatchClosedPayload(merchantID, batchID, batchDateOnly, batchGross, batchFee, netPayout, refunds.refundFils, refunds.feeReversedFils)
 	if err != nil {
 		return BatchResult{}, fmt.Errorf("settlement: CloseBatch: build outbox payload: %w", err)
 	}
@@ -289,6 +307,7 @@ func CloseBatch(ctx context.Context, db *pgxpool.Pool, merchantID uuid.UUID, bus
 		GrossFils:     batchGross,
 		FeeFils:       batchFee,
 		NetPayoutFils: netPayout,
+		RefundFils:    refunds.refundFils,
 		EventCount:    len(eventIDs),
 		LineCount:     len(lines),
 	}, nil
@@ -475,4 +494,53 @@ func RunDailyBatch(ctx context.Context, db *pgxpool.Pool, businessDate time.Time
 	}
 
 	return report, nil
+}
+
+// claimedRefunds is what claimRefundsForBatch took into a batch.
+type claimedRefunds struct {
+	ids             []uuid.UUID
+	refundFils      money.Fils
+	feeReversedFils money.Fils
+}
+
+// claimRefundsForBatch locks the merchant's succeeded, not-yet-batched refunds
+// made before `before` (the end of this business day), oldest first, and
+// takes each one that still leaves the payout at or above zero. A refund
+// bigger than what is left stays unbatched and is picked up by a later day's
+// batch, so a refund-heavy day never produces a negative payout that nothing
+// would ever collect.
+func claimRefundsForBatch(ctx context.Context, tx pgx.Tx, merchantID uuid.UUID, before time.Time, netBeforeRefunds money.Fils) (claimedRefunds, error) {
+	rows, err := tx.Query(ctx, `
+		SELECT id, amount_fils, fee_reversed_fils
+		  FROM refunds
+		 WHERE merchant_id = $1
+		   AND status = 'succeeded'
+		   AND settlement_batch_id IS NULL
+		   AND occurred_at < $2
+		 ORDER BY occurred_at, id
+		 FOR UPDATE
+	`, merchantID, before)
+	if err != nil {
+		return claimedRefunds{}, err
+	}
+	defer rows.Close()
+
+	var claimed claimedRefunds
+	remaining := netBeforeRefunds
+	for rows.Next() {
+		var id uuid.UUID
+		var amount, feeReversed int64
+		if err := rows.Scan(&id, &amount, &feeReversed); err != nil {
+			return claimedRefunds{}, err
+		}
+		cost := money.Fils(amount - feeReversed)
+		if remaining-cost < 0 {
+			continue
+		}
+		remaining -= cost
+		claimed.ids = append(claimed.ids, id)
+		claimed.refundFils += money.Fils(amount)
+		claimed.feeReversedFils += money.Fils(feeReversed)
+	}
+	return claimed, rows.Err()
 }

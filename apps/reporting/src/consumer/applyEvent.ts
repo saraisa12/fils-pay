@@ -90,8 +90,13 @@ async function applyBatchClosed(client: PoolClient, row: OutboxEventRow): Promis
     netPayoutFils: number;
   };
 
-  const batchResult = await client.query<{ status: string; paid_at: Date | null }>(
-    `SELECT status, paid_at FROM settlement_batches WHERE id = $1`,
+  const batchResult = await client.query<{
+    status: string;
+    paid_at: Date | null;
+    refund_fils: string;
+    fee_reversed_fils: string;
+  }>(
+    `SELECT status, paid_at, refund_fils, fee_reversed_fils FROM settlement_batches WHERE id = $1`,
     [payload.batchId],
   );
   const batch = batchResult.rows[0];
@@ -99,12 +104,14 @@ async function applyBatchClosed(client: PoolClient, row: OutboxEventRow): Promis
 
   await client.query(
     `INSERT INTO merchant_payout_trends
-        (merchant_id, settlement_batch_id, batch_date, status, gross_fils, fee_fils, net_payout_fils, paid_at, last_updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())
+        (merchant_id, settlement_batch_id, batch_date, status, gross_fils, fee_fils, net_payout_fils, paid_at,
+         refund_fils, fee_reversed_fils, last_updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now())
      ON CONFLICT (merchant_id, settlement_batch_id) DO UPDATE
        SET status = EXCLUDED.status, gross_fils = EXCLUDED.gross_fils,
            fee_fils = EXCLUDED.fee_fils, net_payout_fils = EXCLUDED.net_payout_fils,
-           paid_at = EXCLUDED.paid_at, last_updated_at = now()`,
+           paid_at = EXCLUDED.paid_at, refund_fils = EXCLUDED.refund_fils,
+           fee_reversed_fils = EXCLUDED.fee_reversed_fils, last_updated_at = now()`,
     [
       payload.merchantId,
       payload.batchId,
@@ -114,6 +121,8 @@ async function applyBatchClosed(client: PoolClient, row: OutboxEventRow): Promis
       payload.feeFils,
       payload.netPayoutFils,
       batch.paid_at,
+      Number(batch.refund_fils),
+      Number(batch.fee_reversed_fils),
     ],
   );
 
@@ -144,11 +153,12 @@ async function applyBatchClosed(client: PoolClient, row: OutboxEventRow): Promis
       `SELECT captured_count FROM merchant_daily_volume WHERE merchant_id = $1 AND volume_date = $2`,
       [payload.merchantId, payload.batchDate],
     );
-    const rollup = rollupResult.rows[0] as { captured_count: number };
-    if (rollup.captured_count < groundTruthCount) {
+    const rollup = rollupResult.rows[0] as { captured_count: number } | undefined;
+    // No rollup row at all is the most lagged state there is: warn, never crash the pass.
+    if (!rollup || rollup.captured_count < groundTruthCount) {
       console.warn(
         `reporting rollup lags ground truth for merchant ${payload.merchantId} on ${payload.batchDate}: ` +
-          `rollup=${rollup.captured_count} ground_truth=${groundTruthCount}`,
+          `rollup=${rollup?.captured_count ?? 0} ground_truth=${groundTruthCount}`,
       );
     }
   }
@@ -161,13 +171,18 @@ async function applyBatchClosed(client: PoolClient, row: OutboxEventRow): Promis
  * the outbox (the consumer SELECT in runConsumerPass will include
  * "transaction.refunded" once the refund flow lands).
  */
+/**
+ * Counts one refund against the Asia/Bahrain business day it happened on, the
+ * same day bucketing captures and voids use (a UTC date put refunds between
+ * 21:00 and 24:00 UTC on the wrong day).
+ */
 export async function applyDailySummaryRollup(
   client: PoolClient,
   merchantId: string,
   occurredAt: Date,
   amountFils: number,
 ): Promise<void> {
-  const summaryDate = occurredAt.toISOString().slice(0, 10);
+  const summaryDate = toBahrainDateString(occurredAt);
   await client.query(
     `INSERT INTO merchant_daily_volume (merchant_id, volume_date, refund_count, refund_gross_fils, last_updated_at)
      VALUES ($1, $2, 1, $3, now())
@@ -179,15 +194,11 @@ export async function applyDailySummaryRollup(
   );
 }
 
-/**
- * Dispatches one outbox_events row to the applier for its event_type. The
- * `default` branch exists only so a future EventType addition not yet
- * wired into this switch fails loudly (a thrown error rolls back the whole
- * pass, per runConsumerPass's transactional discipline) rather than
- * silently dropping the event — runConsumerPass's own SELECT already
- * filters to the three types handled below, so this branch should never
- * actually run against real data.
- */
+async function applyRefundSucceeded(client: PoolClient, row: OutboxEventRow): Promise<void> {
+  const payload = row.payload as { merchantId: string; amountFils: number };
+  await applyDailySummaryRollup(client, payload.merchantId, row.created_at, payload.amountFils);
+}
+
 export async function applyEvent(client: PoolClient, row: OutboxEventRow): Promise<void> {
   switch (row.event_type) {
     case "transaction.captured":
@@ -196,6 +207,8 @@ export async function applyEvent(client: PoolClient, row: OutboxEventRow): Promi
       return applyTransactionVoided(client, row);
     case "settlement.batch_closed":
       return applyBatchClosed(client, row);
+    case "refund.succeeded":
+      return applyRefundSucceeded(client, row);
     default:
       throw new Error(`applyEvent: unhandled event_type ${row.event_type}`);
   }

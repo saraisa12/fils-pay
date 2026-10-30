@@ -146,6 +146,16 @@ export interface AdminMerchantDetail {
   webhookEndpoints: AdminWebhookEndpointSummary[];
   balance: MerchantBalance | null;
   currentFeeSchedule: CurrentFeeScheduleDisplay | null;
+  /** Latest refunds, newest first (`settlementBatchId` null until a payout nets them off). */
+  recentRefunds: Array<{
+    id: string;
+    transactionId: string;
+    amountFils: number;
+    feeReversedFils: number;
+    reason: string | null;
+    settlementBatchId: string | null;
+    occurredAt: string;
+  }>;
   recentSettlementBatches: SettlementBatchSummary[];
 }
 

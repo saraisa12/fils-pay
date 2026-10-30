@@ -36,12 +36,14 @@ type RecalcResult struct {
 
 // batchRow is one settlement_batches row as read by the recalculation scan.
 type batchRow struct {
-	id            uuid.UUID
-	batchDate     time.Time
-	status        string
-	grossFils     money.Fils
-	feeFils       money.Fils
-	netPayoutFils money.Fils
+	id              uuid.UUID
+	batchDate       time.Time
+	status          string
+	grossFils       money.Fils
+	feeFils         money.Fils
+	netPayoutFils   money.Fils
+	refundFils      money.Fils
+	feeReversedFils money.Fils
 }
 
 // RecalculateMDR re-derives the fee on a merchant's closed batches in
@@ -61,7 +63,7 @@ func RecalculateMDR(ctx context.Context, db *pgxpool.Pool, merchantID uuid.UUID,
 	}
 
 	rows, err := tx.Query(ctx, `
-		SELECT id, batch_date, status, gross_fils, fee_fils, net_payout_fils
+		SELECT id, batch_date, status, gross_fils, fee_fils, net_payout_fils, refund_fils, fee_reversed_fils
 		  FROM settlement_batches
 		 WHERE merchant_id = $1 AND batch_date >= $2 AND batch_date < $3
 		   AND status <> 'open'
@@ -74,14 +76,16 @@ func RecalculateMDR(ctx context.Context, db *pgxpool.Pool, merchantID uuid.UUID,
 	var batches []batchRow
 	for rows.Next() {
 		var b batchRow
-		var gross, fee, net int64
-		if err := rows.Scan(&b.id, &b.batchDate, &b.status, &gross, &fee, &net); err != nil {
+		var gross, fee, net, refund, feeRev int64
+		if err := rows.Scan(&b.id, &b.batchDate, &b.status, &gross, &fee, &net, &refund, &feeRev); err != nil {
 			rows.Close()
 			return RecalcResult{}, fmt.Errorf("settlement: RecalculateMDR: scan batch: %w", err)
 		}
 		b.grossFils = money.Fils(gross)
 		b.feeFils = money.Fils(fee)
 		b.netPayoutFils = money.Fils(net)
+		b.refundFils = money.Fils(refund)
+		b.feeReversedFils = money.Fils(feeRev)
 		batches = append(batches, b)
 	}
 	if err := rows.Err(); err != nil {
@@ -100,7 +104,7 @@ func RecalculateMDR(ctx context.Context, db *pgxpool.Pool, merchantID uuid.UUID,
 		if diff == 0 {
 			continue
 		}
-		newNetPayout := b.grossFils - newFee
+		newNetPayout := NetPayoutAfterRefundsFils(b.grossFils, newFee, b.refundFils, b.feeReversedFils)
 		// am: posts against the OLD batch id so it never lands in a new payout?? fixed in FP-244 i think
 		if err := postMdrAdjustment(ctx, tx, merchantID, b.id, diff); err != nil {
 			return RecalcResult{}, err

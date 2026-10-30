@@ -256,6 +256,11 @@
   color: #8a5a00;
 }
 
+.dash-status-refunded,
+.dash-status-partially_refunded {
+  color: #6b3fa0;
+}
+
 .dash-status-voided,
 .dash-status-canceled,
 .dash-status-disabled,

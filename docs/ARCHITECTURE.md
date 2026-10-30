@@ -55,6 +55,19 @@ Fees are computed per capture event, not per batch total. Rates come from
 `fee_schedules`, falling back to `merchants.mdr_bps`. Discounts reduce the
 amount the MDR is charged on.
 
+## Refunds
+
+`POST /v1/merchants/:merchantId/refunds` (also `POST /v1/refunds`), owner/finance only, `Idempotency-Key`
+required. One transaction: lock the transaction row (scoped to the caller's merchant), check the amount
+against **captured minus already refunded**, call the acquirer, then journal the reversal (merchant payable
+debit, card scheme clearing credit, and the fee share back). The fee returned is cumulative, so several
+partial refunds add up to exactly the fee charged. Status: `partially_refunded`, then `refunded` once every
+captured fil has gone back.
+
+Settlement nets refunds off the next payout: `net = gross - fee - refunds + fee returned`. A refund that
+would take a day's payout below zero stays unbatched and is netted by a later day. `refund.succeeded` is
+delivered to merchant webhooks and counted in the daily reporting rollup (Asia/Bahrain day).
+
 ## Events
 
 An outbox row is inserted in the same transaction as the write that produced

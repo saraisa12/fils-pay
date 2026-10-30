@@ -35,7 +35,6 @@ func RecordPlatformProcessedVolume(ctx context.Context, tx pgx.Tx, current int32
 // volume reaches the platform's volume-tier threshold — a loyalty-style
 // discount for the platform having processed enough real activity to have
 // earned better acquirer-side economics to pass through.
-//
 func VolumeTierMdrBonusBps(totalProcessedFils int32) int64 {
 	const volumeTierThresholdFils int32 = 2_000_000_000 // 2,000,000.000 BD
 	const volumeTierBonusBps int64 = 15                 // 0.15%
