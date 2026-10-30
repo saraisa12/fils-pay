@@ -163,7 +163,7 @@ export function PaymentLinkDetailPage() {
         <RequireRole allow={["owner", "finance"]}>
           <button
             type="button"
-            className="dash-button"
+            className="dash-button dash-danger"
             disabled={submitting}
             onClick={() => void handleCancel()}
           >

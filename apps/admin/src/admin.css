@@ -270,3 +270,76 @@ button:disabled {
     overflow-wrap: anywhere;
   }
 }
+
+/* ---- Design pass ----
+   Same accent and button roles as the merchant dashboard. */
+:root {
+  --admin-accent: #0f6b55;
+  --admin-accent-hover: #0b5644;
+  --admin-accent-tint: #e7f2ee;
+  --admin-danger: #b42318;
+  --admin-danger-tint: #fef3f2;
+  --admin-head: #f1f4f2;
+}
+
+/* Links in one colour (no browser blue next to visited purple). */
+a {
+  color: var(--admin-accent);
+}
+
+.admin-nav a.active {
+  color: var(--admin-accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.4em;
+}
+
+/* Main action of a form: filled, so it is the obvious next step. */
+button[type="submit"],
+button.admin-primary {
+  background: var(--admin-accent);
+  border-color: var(--admin-accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+button[type="submit"]:hover:not(:disabled),
+button.admin-primary:hover:not(:disabled) {
+  background: var(--admin-accent-hover);
+}
+
+/* Irreversible or rejecting actions: red, never mistaken for the safe one. */
+button.admin-danger {
+  background: #fff;
+  border-color: var(--admin-danger);
+  color: var(--admin-danger);
+  font-weight: 600;
+}
+
+button.admin-danger:hover:not(:disabled) {
+  background: var(--admin-danger-tint);
+}
+
+/* Visible keyboard focus everywhere. */
+:is(a, button, input, select, textarea):focus-visible {
+  outline: 2px solid var(--admin-accent);
+  outline-offset: 2px;
+}
+
+/* Tables: tinted header row, and the row under the pointer highlighted. */
+.admin-table th {
+  background: var(--admin-head);
+}
+
+.admin-table tbody tr:hover td {
+  background: var(--admin-accent-tint);
+}
+
+/* The selected tab is the page you're on, not an unavailable button:
+   show it as selected instead of faded out. */
+button.admin-tab:disabled {
+  opacity: 1;
+  background: var(--admin-accent-tint);
+  border-color: var(--admin-accent);
+  color: var(--admin-accent);
+  font-weight: 600;
+}

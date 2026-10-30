@@ -228,7 +228,7 @@ export function SettlementPage() {
               <strong>Rebuild balances for every merchant?</strong> This recalculates all cached
               payable balances and records the action in the admin audit log.
             </p>
-            <button type="button" disabled={rebuildBusy} onClick={() => void handleRebuild()}>
+            <button type="button" disabled={rebuildBusy} className="admin-danger" onClick={() => void handleRebuild()}>
               {rebuildBusy ? "Rebuilding..." : "Yes, rebuild all balances"}
             </button>{" "}
             <button type="button" disabled={rebuildBusy} onClick={() => setConfirmingRebuild(false)}>

@@ -389,6 +389,7 @@ export function MerchantDetailPage() {
             <button
               type="button"
               disabled={busy || !adjustDeltaFils.trim() || !adjustReason.trim()}
+              className="admin-primary"
               onClick={() => void handleAdjustBalance()}
             >
               Adjust balance
@@ -480,10 +481,10 @@ export function MerchantDetailPage() {
             <textarea value={kycNotes} onChange={(e) => setKycNotes(e.target.value)} rows={3} />
           </label>
           <div>
-            <button type="button" disabled={busy} onClick={() => void handleKycReview("approved")}>
+            <button type="button" disabled={busy} className="admin-primary" onClick={() => void handleKycReview("approved")}>
               Approve KYC
             </button>{" "}
-            <button type="button" disabled={busy} onClick={() => void handleKycReview("rejected")}>
+            <button type="button" disabled={busy} className="admin-danger" onClick={() => void handleKycReview("rejected")}>
               Reject KYC
             </button>
           </div>

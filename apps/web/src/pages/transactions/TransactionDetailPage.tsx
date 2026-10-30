@@ -212,7 +212,7 @@ export function TransactionDetailPage() {
                   </button>
                 </form>
               ) : (
-                <button type="button" className="dash-button" onClick={() => setCaptureOpen(true)}>
+                <button type="button" className="dash-button dash-primary" onClick={() => setCaptureOpen(true)}>
                   Capture
                 </button>
               )
@@ -221,7 +221,7 @@ export function TransactionDetailPage() {
             {voidable ? (
               <button
                 type="button"
-                className="dash-button"
+                className="dash-button dash-danger"
                 disabled={submitting}
                 onClick={() => void handleVoid()}
               >

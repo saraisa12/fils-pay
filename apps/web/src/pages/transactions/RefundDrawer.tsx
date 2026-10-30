@@ -121,7 +121,7 @@ export function RefundDrawer({ txn, onRefunded }: RefundDrawerProps) {
               <input type="text" maxLength={200} value={reason} onChange={(e) => setReason(e.target.value)} />
             </label>
             <p className="dash-muted">Still refundable: {bhd(refundableFils)}</p>
-            <button type="submit" className="dash-button" disabled={submitting}>
+            <button type="submit" className="dash-button dash-danger" disabled={submitting}>
               {submitting ? "Refunding..." : "Refund"}
             </button>
             <button
