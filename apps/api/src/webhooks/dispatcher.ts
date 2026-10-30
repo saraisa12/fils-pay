@@ -6,7 +6,6 @@ import { decodeEncryptionKey, decryptSecret } from "./secretCrypto.js";
 import { signPayload } from "./sign.js";
 import { canonicalJson } from "../payments/idempotency.js";
 import { buildEnvelope } from "./envelope.js";
-import { recordPayoutDisbursementEffect } from "./payoutDisbursement.js";
 import { WEBHOOK_DELIVERY_ID_HEADER, WEBHOOK_SIGNATURE_HEADER } from "./headers.js";
 import type { WebhookTransport } from "./transport.js";
 
@@ -36,12 +35,10 @@ const NOTIFY_CHANNEL = "outbox_events_channel";
 
 type PreDeliveryEffect = (pool: Pool, payload: Record<string, unknown>) => Promise<void>;
 
-const PRE_DELIVERY_EFFECTS: Record<string, PreDeliveryEffect> = {
-  "settlement.paid": async (pool, payload) => {
-    const data = payload.data as { settlementBatchId: string; netPayoutFils: number };
-    await recordPayoutDisbursementEffect(pool, data.settlementBatchId, Number(data.netPayoutFils));
-  },
-};
+// B050: no pre-delivery effects. The payout disbursement used to be written
+// here, once per webhook delivery; apps/settlement now records it once per
+// paid batch (payout_notify.go), whether or not the merchant has endpoints.
+const PRE_DELIVERY_EFFECTS: Record<string, PreDeliveryEffect> = {};
 
 export type DispatcherConfig = Pick<
   Config,
