@@ -209,7 +209,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     otpTtlMinutes: parseIntEnv(env.OTP_TTL_MINUTES, 5),
     otpCodeLength: parseIntEnv(env.OTP_CODE_LENGTH, 6),
     otpMaxAttempts: parseIntEnv(env.OTP_MAX_ATTEMPTS, 5),
-    otpDevExpose: parseBoolEnv(env.OTP_DEV_EXPOSE, nodeEnv !== "production"),
+    // B006: off unless explicitly turned on. Defaulting to "on unless
+    // NODE_ENV=production" put the real login code in the HTTP response on
+    // any box where NODE_ENV was unset (staging, the load test).
+    otpDevExpose: parseBoolEnv(env.OTP_DEV_EXPOSE, false),
 
     argon2MemoryKib: parseIntEnv(env.ARGON2_MEMORY_KIB, 19_456),
     argon2TimeCost: parseIntEnv(env.ARGON2_TIME_COST, 2),

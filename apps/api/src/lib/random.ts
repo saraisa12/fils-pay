@@ -1,7 +1,10 @@
-/** Generates a string of `n` random decimal digits (e.g. "042817"). */
+import { randomInt } from "node:crypto";
+
+/** Generates a string of `n` random decimal digits (e.g. "042817").
+ *  B003: used for OTP login codes, so it must be unpredictable. Math.random
+ *  is not crypto-safe (its output can be predicted); crypto.randomInt is. */
 export function randomDigits(n: number): string {
-  const max = 10 ** n;
-  return Math.floor(Math.random() * max)
+  return randomInt(0, 10 ** n)
     .toString()
     .padStart(n, "0");
 }
