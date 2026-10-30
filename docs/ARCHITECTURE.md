@@ -80,7 +80,8 @@ a `Webhook-Delivery-Id` and is signed with HMAC-SHA256.
 - Merchant login is password then OTP. The pending session grants nothing
   until the OTP is verified.
 - Merchant-scoped queries take the merchant from the authenticated context.
-- Outbound webhook signatures are HMAC-SHA256 compared in constant time.
+- Outbound webhook signatures are HMAC-SHA256 over the exact bytes sent. Inbound acquirer callbacks must be signed (HMAC over the raw body, fresh timestamp, constant-time compare) and are stored once per `(transaction, callbackId)`.
+- In production a webhook URL must be https and resolve to a public address; redirects are not followed and responses are read with a size cap.
 - KYC uploads are validated by detected content type (magic bytes).
 
 Payment links are single-use. Expiry is checked against the paying client's
@@ -101,7 +102,8 @@ the action. Credits above the threshold need a second approver.
 | `DATABASE_URL` | all | — |
 | `PGCONN_SETTLEMENT` | settlement | unset |
 | `SETTLEMENT_INTERNAL_TOKEN` | api, settlement | `dev-token` in dev |
-| `ACQUIRER_CALLBACK_REQUIRE_SIGNATURE` | api | `false` |
+| `ACQUIRER_CALLBACK_REQUIRE_SIGNATURE` | api | `true` (unsigned callbacks are refused) |
+| `ACQUIRER_CALLBACK_TOLERANCE_SECONDS` | api | `300` |
 | `FEATURE_ASYNC_CLOSE` | settlement | `0` |
 
 The API is sized for 0.5 vCPU / 512 MB. In compose, all services connect as

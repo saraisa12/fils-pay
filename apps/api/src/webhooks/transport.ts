@@ -9,6 +9,8 @@
  * @property timeoutMs Covers the whole exchange including reading the body (the abort
  * signal stays armed until the body has been read).
  */
+import { assertPublicHost } from "./ssrf.js";
+
 export interface WebhookTransportRequest {
   url: string;
   headers: Record<string, string>;
@@ -30,22 +32,54 @@ export type WebhookTransport = (req: WebhookTransportRequest) => Promise<Webhook
 
 /** Real transport: Node's global fetch with an AbortController-driven
  *  timeout, used by index.ts's production wiring. */
-export function createFetchTransport(): WebhookTransport {
+export interface FetchTransportOptions {
+  /** Refuse destinations that resolve to loopback/private/link-local addresses (production). */
+  blockPrivateAddresses?: boolean;
+  /** Stop reading a response after this many bytes. Default 64 KiB: we only keep a 2 KB excerpt. */
+  maxResponseBytes?: number;
+}
+
+/** Reads at most `maxBytes` of the body, then cancels the rest, so a hostile receiver cannot make us
+ *  buffer a huge (or endless) response. */
+async function readCapped(response: Response, maxBytes: number): Promise<string> {
+  if (!response.body) return "";
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    total += value.byteLength;
+    if (total >= maxBytes) {
+      await reader.cancel().catch(() => {});
+      break;
+    }
+  }
+  return Buffer.concat(chunks).subarray(0, maxBytes).toString("utf8");
+}
+
+export function createFetchTransport(options: FetchTransportOptions = {}): WebhookTransport {
+  const maxResponseBytes = options.maxResponseBytes ?? 65_536;
   return async (req: WebhookTransportRequest): Promise<WebhookTransportResponse> => {
     const controller = new AbortController();
     const timeoutHandle = setTimeout(() => controller.abort(), req.timeoutMs);
     try {
-      // YA: create.ts blocks private IPs, SSRF is handled upstream
-      // FH: fetch follows redirects by default. claude: "set redirect: 'manual' to prevent SSRF via an open redirect"
+      // Checked on every attempt, after DNS, so a hostname that was public when the endpoint was
+      // saved but points inside now is still refused.
+      if (options.blockPrivateAddresses) {
+        await assertPublicHost(new URL(req.url).hostname);
+      }
       const response = await fetch(req.url, {
         method: "POST",
         headers: req.headers,
         body: req.body,
         signal: controller.signal,
+        // A 3xx from the receiver must not walk us to an internal address the URL check never saw.
+        // It is reported like any other non-2xx answer and the delivery is retried.
+        redirect: "manual",
       });
-      // unbounded read, a 1gb response would oom us? — am
-      // MK: timeoutMs bounds it. fine for now, revisit after Eid inshallah
-      const body = await response.text();
+      const body = await readCapped(response, maxResponseBytes);
       return { statusCode: response.status, body };
     } catch (err) {
       return {
