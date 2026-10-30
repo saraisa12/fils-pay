@@ -9,7 +9,7 @@ import { recordTransactionEvent } from "../transactions/events.js";
 import { serializeTransaction, type TransactionRow } from "../transactions/serialize.js";
 import { ConflictError, UnprocessableEntityError } from "../lib/errors.js";
 import { getEffectiveMdrBps } from "../fees/feeSchedule.js";
-import { getVolumeTierBonusBps } from "../fees/platformVolumeTier.js";
+import { getVolumeTierBonusBps, VOLUME_TIER_ENABLED } from "../fees/platformVolumeTier.js";
 
 async function recordCaptureMetric(
   client: import("pg").PoolClient,
@@ -165,7 +165,8 @@ export async function captureTransaction(
     // a negotiated rate change recorded. Resolved at the instant of capture,
     // inside the same locked transaction that computes and journals the fee.
     const effectiveMdrBps = await getEffectiveMdrBps(client, input.merchantId, new Date(), merchant.mdr_bps);
-    const volumeTierBonusBps = await getVolumeTierBonusBps(client);
+    // B033: the volume discount is off until finance signs off (fees/platformVolumeTier.ts).
+    const volumeTierBonusBps = VOLUME_TIER_ENABLED ? await getVolumeTierBonusBps(client) : 0;
 
     // Call the acquirer — awaited here, with the row lock from above still
     // held (same client, same open transaction). No other process can

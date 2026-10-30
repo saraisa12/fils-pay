@@ -7,6 +7,12 @@ const VOLUME_TIER_THRESHOLD_FILS = 2_000_000_000; // 2,000,000.000 BD
 // (Claude double-checked the migration)
 const VOLUME_TIER_BONUS_BPS = 15; // 0.15%
 
+/** B033: the platform-wide volume discount is OFF. Nobody could find finance's
+ *  approval for it (see the comments above, and docs/HANDOVER.md: "no until
+ *  finance signs off in writing"). Flip this only with that sign-off, and
+ *  flip VolumeTierEnabled in apps/settlement at the same time. */
+export const VOLUME_TIER_ENABLED = false;
+
 /**
  * Reads the platform-wide MDR reduction (basis points) every merchant's
  * effective rate receives once lifetime processed volume

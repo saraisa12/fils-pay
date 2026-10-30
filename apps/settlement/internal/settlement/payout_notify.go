@@ -83,14 +83,50 @@ func EnqueuePayoutNotifications(ctx context.Context, db *pgxpool.Pool) (int, err
 		if err != nil {
 			return count, fmt.Errorf("settlement: EnqueuePayoutNotifications: marshal payload: %w", err)
 		}
-		_, err = db.Exec(ctx, `
-			INSERT INTO outbox_events (event_type, aggregate_type, aggregate_id, payload)
-			VALUES ('settlement.paid', 'settlement_batch', $1, $2)
-		`, b.id, payload)
+		// B050: the payout disbursement is recorded here, once per paid batch,
+		// in the same transaction as its settlement.paid event. It used to be a
+		// side effect of each webhook delivery (two endpoints = two payouts, no
+		// endpoint = none). B063: both inserts are no-ops if a concurrent run
+		// (daemon + CLI) already wrote them (unique indexes, migration 0079).
+		inserted, err := recordPaidBatch(ctx, db, b.id, b.netPayoutFils, payload)
 		if err != nil {
-			return count, fmt.Errorf("settlement: EnqueuePayoutNotifications: insert batch %s: %w", b.id, err)
+			return count, fmt.Errorf("settlement: EnqueuePayoutNotifications: batch %s: %w", b.id, err)
 		}
-		count++
+		if inserted {
+			count++
+		}
 	}
 	return count, nil
+}
+
+// recordPaidBatch writes a paid batch's payout disbursement and its
+// settlement.paid outbox event in one transaction. It reports whether the
+// event was new; false means another run already recorded this batch.
+func recordPaidBatch(ctx context.Context, db *pgxpool.Pool, batchID uuid.UUID, netPayoutFils int64, payload []byte) (bool, error) {
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return false, fmt.Errorf("begin: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO settlement_payout_disbursements (settlement_batch_id, amount_fils, disbursement_reference)
+		VALUES ($1, $2, 'disb_' || gen_random_uuid())
+		ON CONFLICT (settlement_batch_id) DO NOTHING
+	`, batchID, netPayoutFils); err != nil {
+		return false, fmt.Errorf("insert disbursement: %w", err)
+	}
+
+	tag, err := tx.Exec(ctx, `
+		INSERT INTO outbox_events (event_type, aggregate_type, aggregate_id, payload)
+		VALUES ('settlement.paid', 'settlement_batch', $1, $2)
+		ON CONFLICT (event_type, aggregate_id) WHERE event_type = 'settlement.paid' DO NOTHING
+	`, batchID, payload)
+	if err != nil {
+		return false, fmt.Errorf("insert outbox event: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return false, fmt.Errorf("commit: %w", err)
+	}
+	return tag.RowsAffected() == 1, nil
 }
