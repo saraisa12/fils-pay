@@ -13,6 +13,7 @@ export interface Config {
   databaseUrl: string;
 
   pgPoolMax: number;
+  maxInflightPayments: number;
   pgPoolMin: number;
   pgPoolIdleTimeoutMs: number;
   pgPoolConnectionTimeoutMs: number;
@@ -201,7 +202,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     port: parseIntEnv(env.PORT, 3000),
     databaseUrl,
 
-    pgPoolMax: parseIntEnv(env.PG_POOL_MAX, 5),
+    // 20 connections: a checkout holds one for ~0.5 s while it calls the acquirer, so throughput is about
+    // pool size / 0.5 s (see docs/CAPACITY.md). 5 capped the checkout at ~9 per second.
+    pgPoolMax: parseIntEnv(env.PG_POOL_MAX, 20),
+    // Money-moving requests allowed in flight before the rest get a fast 503 (0 = no limit).
+    maxInflightPayments: parseIntEnv(env.MAX_INFLIGHT_PAYMENTS, 40),
     pgPoolMin: parseIntEnv(env.PG_POOL_MIN, 0),
     pgPoolIdleTimeoutMs: parseIntEnv(env.PG_POOL_IDLE_TIMEOUT_MS, 30_000),
     pgPoolConnectionTimeoutMs: parseIntEnv(env.PG_POOL_CONNECTION_TIMEOUT_MS, 5_000),

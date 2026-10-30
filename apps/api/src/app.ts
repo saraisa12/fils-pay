@@ -5,6 +5,7 @@ import { createAcquirerSimulator } from "./acquirer/simulator.js";
 import { cookiesPlugin } from "./plugins/cookies.js";
 import { multipartPlugin } from "./plugins/multipart.js";
 import { errorHandler } from "./plugins/errorHandler.js";
+import { loadSheddingPlugin } from "./plugins/loadShedding.js";
 import { healthRoutes } from "./routes/health.js";
 import { authRoutes } from "./routes/auth.js";
 import { businessProfileRoutes } from "./routes/businessProfile.js";
@@ -39,13 +40,17 @@ export interface BuildAppOptions {
  * tests use `app.inject(...)` against this — no real socket needed.
  */
 export function buildApp(config: Config, pool: Pool, options: BuildAppOptions = {}): FastifyInstance {
-  const app = Fastify({ logger: true });
+  // disableRequestLogging: the two info lines per request ("incoming request" / "request completed") cost
+  // more CPU than shedding a request does, and at several thousand refused requests per second they starve
+  // the event loop that is still serving real checkouts. Errors are still logged by the error handler.
+  const app = Fastify({ logger: true, disableRequestLogging: true });
 
   app.decorate("db", pool);
   app.decorate("config", config);
   app.decorate("acquirer", createAcquirerSimulator(config));
   app.decorate("webhookTransport", options.webhookTransport ?? createFetchTransport({ blockPrivateAddresses: config.nodeEnv === "production" }));
 
+  app.register(loadSheddingPlugin, { maxInflight: config.maxInflightPayments });
   app.register(cookiesPlugin);
   app.register(multipartPlugin, { config });
   app.setErrorHandler(errorHandler);
