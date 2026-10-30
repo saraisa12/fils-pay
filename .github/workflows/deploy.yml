@@ -1,0 +1,41 @@
+# Deploys main to the demo server: after every push/merge to main, GitHub logs
+# into the server over SSH and runs ~/deploy.sh (pull, rebuild, migrate,
+# rebuild and publish the websites).
+#
+# Needs three repository secrets (Settings > Secrets and variables > Actions):
+#   DEPLOY_SSH_KEY  private key whose .pub is in the server's authorized_keys
+#   DEPLOY_HOST     server IP or hostname
+#   DEPLOY_USER     user that owns ~/fils-pay and ~/deploy.sh
+name: Deploy to server
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+# Never run two deploys at the same time; a newer one waits for the older.
+concurrency: deploy
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Run ~/deploy.sh on the server
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          if [ -z "$SSH_KEY" ] || [ -z "$HOST" ] || [ -z "$DEPLOY_USER" ]; then
+            echo "Missing DEPLOY_SSH_KEY, DEPLOY_HOST or DEPLOY_USER secret." >&2
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts
+          ssh "$DEPLOY_USER@$HOST" '~/deploy.sh'
