@@ -88,6 +88,7 @@ test("a refund can never exceed what was captured (not what was authorized)", as
 
   const tooMuch = await refund(m.rawKey, m.merchantId, { transactionId: txn, amountFils: 5_000 });
   assert.equal(tooMuch.statusCode, 422, tooMuch.body);
+  assert.equal(tooMuch.json().error, "refund_exceeds_refundable");
   assert.equal(tooMuch.json().code, "refund_exceeds_refundable");
   assert.equal(tooMuch.json().refundableFils, 4_000);
 

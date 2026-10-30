@@ -197,6 +197,16 @@ export interface AdminMerchantDetail {
   apiKeys: ApiKeySummary[];
   webhookEndpoints: WebhookEndpointSummary[];
   balance: { cachedPayableFils: number; lastSettlementBatchId: string | null; updatedAt: Date } | null;
+  /** Latest refunds, newest first. */
+  recentRefunds: Array<{
+    id: string;
+    transactionId: string;
+    amountFils: number;
+    feeReversedFils: number;
+    reason: string | null;
+    settlementBatchId: string | null;
+    occurredAt: Date;
+  }>;
   currentFeeSchedule: CurrentFeeScheduleDisplay | null;
   recentSettlementBatches: Array<{
     id: string;
@@ -280,6 +290,24 @@ export async function getMerchantDetailForAdmin(
     [merchantId],
   );
 
+  const refundsResult = await pool.query<{
+    id: string;
+    transaction_id: string;
+    amount_fils: string;
+    fee_reversed_fils: string;
+    reason: string | null;
+    settlement_batch_id: string | null;
+    occurred_at: Date;
+  }>(
+    `SELECT id, transaction_id, amount_fils::text AS amount_fils, fee_reversed_fils::text AS fee_reversed_fils,
+            reason, settlement_batch_id, occurred_at
+       FROM refunds
+      WHERE merchant_id = $1 AND status = 'succeeded'
+      ORDER BY occurred_at DESC, id DESC
+      LIMIT 10`,
+    [merchantId],
+  );
+
   const [apiKeys, webhookEndpoints, currentFeeSchedule] = await Promise.all([
     listApiKeys(pool, merchantId),
     listWebhookEndpoints(pool, merchantId),
@@ -309,6 +337,15 @@ export async function getMerchantDetailForAdmin(
           updatedAt: balanceRow.updated_at,
         }
       : null,
+    recentRefunds: refundsResult.rows.map((row) => ({
+      id: row.id,
+      transactionId: row.transaction_id,
+      amountFils: Number(row.amount_fils),
+      feeReversedFils: Number(row.fee_reversed_fils),
+      reason: row.reason,
+      settlementBatchId: row.settlement_batch_id,
+      occurredAt: row.occurred_at,
+    })),
     recentSettlementBatches: batchesResult.rows.map((row) => ({
       id: row.id,
       batchDate: row.batch_date,

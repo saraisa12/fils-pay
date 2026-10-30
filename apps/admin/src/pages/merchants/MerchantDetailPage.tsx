@@ -310,6 +310,38 @@ export function MerchantDetailPage() {
         <p className="admin-muted">No cached balance row yet.</p>
       )}
 
+      <h2>Recent refunds</h2>
+      {detail.recentRefunds.length === 0 ? (
+        <p className="admin-muted">No refunds yet.</p>
+      ) : (
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>When</th>
+              <th>Transaction</th>
+              <th>Amount</th>
+              <th>Fee returned</th>
+              <th>Reason</th>
+              <th>Settled</th>
+            </tr>
+          </thead>
+          <tbody>
+            {detail.recentRefunds.map((refund) => (
+              <tr key={refund.id}>
+                <td>{new Date(refund.occurredAt).toLocaleString()}</td>
+                <td>
+                  <code>{refund.transactionId}</code>
+                </td>
+                <td>{bhd(refund.amountFils)}</td>
+                <td>{bhd(refund.feeReversedFils)}</td>
+                <td>{refund.reason ?? "—"}</td>
+                <td>{refund.settlementBatchId ? "Netted off a payout" : "Pending"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
       <h2>Adjust balance</h2>
       <p className="admin-muted">
         A direct correction to this merchant&apos;s cached payable balance, for when support has

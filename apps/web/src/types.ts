@@ -92,6 +92,8 @@ export interface TransactionDto {
   status: TransactionStatus;
   amountFils: number;
   capturedFils: number;
+  /** Cumulative refunded amount; what is still refundable is capturedFils - refundedFils. */
+  refundedFils: number;
   currency: string;
   reference: string | null;
   acquirerReference: string;
@@ -215,7 +217,7 @@ export interface ReplayResponse {
 // --- settlement / reconciliation ---
 export type SettlementBatchStatus = "open" | "closed" | "paid";
 
-/** @property netPayoutFils Always exactly grossFils - feeFils. */
+/** @property netPayoutFils grossFils - feeFils - refundFils + feeReversedFils. */
 export interface SettlementBatchDto {
   id: string;
   batchDate: string;
@@ -223,6 +225,9 @@ export interface SettlementBatchDto {
   grossFils: number;
   feeFils: number;
   netPayoutFils: number;
+  /** Refunds netted off this payout, and the share of the fee handed back on them. */
+  refundFils: number;
+  feeReversedFils: number;
   closedAt: string | null;
   paidAt: string | null;
 }
@@ -272,6 +277,8 @@ export interface VolumePointDto {
   capturedCount: number;
   capturedGrossFils: number;
   voidedCount: number;
+  refundCount: number;
+  refundGrossFils: number;
 }
 
 /** `readModelAsOf` is nullable on the two lagged widgets: it reads
@@ -291,6 +298,8 @@ export interface PayoutTrendPointDto {
   grossFils: number;
   feeFils: number;
   netPayoutFils: number;
+  refundFils: number;
+  feeReversedFils: number;
   paidAt: string | null;
 }
 

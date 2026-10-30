@@ -112,6 +112,7 @@ export function OverviewPage() {
             <th>Captured</th>
             <th>Gross</th>
             <th>Voided</th>
+            <th>Refunds</th>
             <th />
           </tr>
         </thead>
@@ -122,6 +123,10 @@ export function OverviewPage() {
               <td>{formatCount(point.capturedCount)}</td>
               <td>{bhd(point.capturedGrossFils)}</td>
               <td>{formatCount(point.voidedCount)}</td>
+              <td>
+                {formatCount(point.refundCount)}
+                {point.refundCount > 0 ? <div className="dash-muted">{bhd(point.refundGrossFils)}</div> : null}
+              </td>
               <td className="dash-bar-cell">
                 {/* A plain CSS bar, scaled to the window's own peak — no
                     charting library, no new dependency. */}
@@ -134,7 +139,7 @@ export function OverviewPage() {
           ))}
           {volumes && volumes.points.length === 0 ? (
             <tr>
-              <td colSpan={5}>No captured volume in this window.</td>
+              <td colSpan={6}>No captured volume in this window.</td>
             </tr>
           ) : null}
         </tbody>
@@ -151,6 +156,7 @@ export function OverviewPage() {
             <th>Status</th>
             <th>Gross</th>
             <th>Fee</th>
+            <th>Refunds</th>
             <th>Net payout</th>
             <th>Paid</th>
           </tr>
@@ -164,13 +170,14 @@ export function OverviewPage() {
               <td>{point.status}</td>
               <td>{bhd(point.grossFils)}</td>
               <td>{bhd(point.feeFils)}</td>
+              <td>{bhd(point.refundFils)}</td>
               <td>{bhd(point.netPayoutFils)}</td>
               <td>{dateTime(point.paidAt)}</td>
             </tr>
           ))}
           {payouts && payouts.points.length === 0 ? (
             <tr>
-              <td colSpan={6}>No settled batches in this window.</td>
+              <td colSpan={7}>No settled batches in this window.</td>
             </tr>
           ) : null}
         </tbody>

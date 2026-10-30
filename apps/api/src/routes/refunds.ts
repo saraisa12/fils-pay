@@ -49,6 +49,25 @@ function parseRefundBody(body: RefundBody | undefined) {
   return { transactionId, amountFils: amount, reason: typeof reason === "string" ? reason : undefined };
 }
 
+const REFUND_MESSAGES: Record<string, string> = {
+  transaction_not_refundable: "This transaction cannot be refunded in its current status.",
+  refund_amount_invalid: "The refund amount must be greater than zero.",
+  refund_exceeds_refundable: "The refund is more than what is still refundable on this transaction.",
+};
+
+/**
+ * The validators answer `{ ok: false, code, ... }`. Every other error in the
+ * API is `{ error, message }`, so add that shape (keeping the original
+ * fields) and clients need only one way to read a failure.
+ */
+function toErrorShape(body: unknown): unknown {
+  if (typeof body === "object" && body !== null && (body as { ok?: unknown }).ok === false) {
+    const { code } = body as { code: string };
+    return { error: code, message: REFUND_MESSAGES[code] ?? code, ...(body as object) };
+  }
+  return body;
+}
+
 const REFUND_ROLES = requireMerchantRole("owner", "finance");
 
 /**
@@ -71,7 +90,7 @@ export async function refundRoutes(app: FastifyInstance): Promise<void> {
         idempotencyKey,
         actor: requireMerchantWriterActor(auth),
       });
-      reply.code(result.statusCode).send(result.body);
+      reply.code(result.statusCode).send(toErrorShape(result.body));
     },
   );
 }
@@ -94,7 +113,7 @@ export async function refundMerchantRoutes(app: FastifyInstance): Promise<void> 
         idempotencyKey,
         actor: requireMerchantWriterActor(auth),
       });
-      reply.code(result.statusCode).send(result.body);
+      reply.code(result.statusCode).send(toErrorShape(result.body));
     },
   );
 }
