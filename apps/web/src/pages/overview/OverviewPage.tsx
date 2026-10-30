@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { KpiCard, PageHeader, Skeleton } from "@filspay/ui";
 import { getPayoutTrends, getTopLinks, getVolumes } from "../../api/analytics.js";
 import { describeError } from "../../api/client.js";
 import { StalenessBadge } from "../../components/StalenessBadge.js";
@@ -65,9 +66,61 @@ export function OverviewPage() {
 
   const peakGross = Math.max(1, ...(volumes?.points.map((point) => point.capturedGrossFils) ?? [1]));
 
+  // Totals over the window the server returned, summed from its own points
+  // (whole fils; no float maths, no client-side currency conversion).
+  const totals = volumes?.points.reduce(
+    (acc, p) => ({
+      count: acc.count + p.capturedCount,
+      gross: acc.gross + p.capturedGrossFils,
+      voided: acc.voided + p.voidedCount,
+      refundCount: acc.refundCount + p.refundCount,
+      refundGross: acc.refundGross + p.refundGrossFils,
+    }),
+    { count: 0, gross: 0, voided: 0, refundCount: 0, refundGross: 0 },
+  );
+  const paidOut = payouts?.points.reduce((sum, p) => (p.paidAt ? sum + p.netPayoutFils : sum), 0);
+
   return (
     <section>
-      <h1>Overview</h1>
+      <PageHeader
+        title="Overview"
+        description="Captured volume, refunds and payouts for the selected window. Leave the dates blank for the last 30 Bahrain days."
+      />
+
+      {loading && !volumes ? <Skeleton lines={4} label="Loading overview" /> : null}
+      {totals ? (
+        <div className="fp-kpi-grid">
+          <KpiCard label="Captured volume" value={bhd(totals.gross)} hint={`${formatCount(totals.count)} captured payments`} tone="good" />
+          <KpiCard
+            label="Refunds"
+            value={bhd(totals.refundGross)}
+            hint={`${formatCount(totals.refundCount)} refunds`}
+            tone={totals.refundCount > 0 ? "warn" : "default"}
+          />
+          <KpiCard label="Voided" value={formatCount(totals.voided)} hint="authorizations released" />
+          {paidOut !== undefined ? <KpiCard label="Paid out" value={bhd(paidOut)} hint="net of fees and refunds" tone="good" /> : null}
+        </div>
+      ) : null}
+
+      {volumes && volumes.points.length > 0 ? (
+        <div className="fp-chart">
+          <h2>Captured volume by day</h2>
+          <div className="fp-chart-bars" role="img" aria-label="Bar chart of captured volume per day; the table below has the same figures">
+            {volumes.points.map((point) => (
+              <div
+                key={point.date}
+                className="fp-chart-bar"
+                title={`${point.date}: ${bhd(point.capturedGrossFils)}`}
+                style={{ height: `${Math.max(2, (point.capturedGrossFils / peakGross) * 100)}%` }}
+              />
+            ))}
+          </div>
+          <div className="fp-chart-axis">
+            <span>{volumes.points[0]?.date}</span>
+            <span>{volumes.points[volumes.points.length - 1]?.date}</span>
+          </div>
+        </div>
+      ) : null}
 
       <form
         className="dash-form dash-form-inline"

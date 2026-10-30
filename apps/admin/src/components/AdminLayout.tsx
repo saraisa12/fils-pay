@@ -1,10 +1,19 @@
 import { useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useNavigate } from "react-router-dom";
+import { AppShell, InlineAlert, type NavItem } from "@filspay/ui";
 import { useAdminAuth } from "../auth/AdminAuthContext.js";
 import { describeError, WEB_BASE_URL } from "../api/client.js";
 import { ImpersonationBanner } from "./ImpersonationBanner.js";
 
-/** Nav shell for every admin-plane screen: who you are signed in as, the
+const NAV: NavItem[] = [
+  { to: "/merchants", label: "Merchants", icon: "merchants" },
+  { to: "/credits", label: "Credits", icon: "credits" },
+  { to: "/settlement", label: "Settlement ops", icon: "settlement" },
+  { to: "/adjustment-imports", label: "Import adjustments", icon: "upload" },
+  { to: "/webhooks", label: "Webhook replay", icon: "replay" },
+];
+
+/** Shell for every admin-plane screen: who you are signed in as, the
  *  section links, a logout, and — above all of it — the impersonation
  *  banner when a grant is live. */
 // YA: nav order per Huda's request (Credits first)
@@ -24,31 +33,15 @@ export function AdminLayout() {
   }
 
   return (
-    <div className="admin-shell">
-      <ImpersonationBanner />
-
-      <header className="admin-header">
-        <div className="admin-brand">FilsPay Admin</div>
-        <nav className="admin-nav">
-          <NavLink to="/merchants">Merchants</NavLink>
-          <NavLink to="/credits">Credits</NavLink>
-          <NavLink to="/settlement">Settlement ops</NavLink>
-          <NavLink to="/adjustment-imports">Import adjustments</NavLink>
-          <NavLink to="/webhooks">Webhook replay</NavLink>
-        </nav>
-        <div className="admin-identity">
-          {admin ? (
-            <span>
-              {admin.email} <span className="admin-role-chip">{admin.role}</span>
-            </span>
-          ) : null}
-          <button type="button" onClick={() => void handleSignOut()}>
-            Log out
-          </button>
-        </div>
-      </header>
-
-      {error ? <p className="admin-error">{error}</p> : null}
+    <AppShell
+      brand="FilsPay"
+      product="Admin console"
+      nav={NAV}
+      user={admin ? { primary: admin.email, badge: admin.role } : null}
+      onSignOut={() => void handleSignOut()}
+      banner={<ImpersonationBanner />}
+    >
+      {error ? <InlineAlert>{error}</InlineAlert> : null}
 
       {impersonation ? (
         // An explicit "exit view-as-merchant" action is required before
@@ -57,7 +50,7 @@ export function AdminLayout() {
         // itself does not depend on it — /v1/admin/* never reads the
         // impersonation cookie, and the merchant side never reads the admin
         // session cookie.
-        <main className="admin-main">
+        <>
           <h1>Admin screens are paused</h1>
           <p>
             An impersonation grant is active. Use <strong>Exit impersonation</strong> above to end it
@@ -66,12 +59,10 @@ export function AdminLayout() {
           <p>
             Merchant screens are at <code>{WEB_BASE_URL}</code> while the grant lasts.
           </p>
-        </main>
+        </>
       ) : (
-        <main className="admin-main">
-          <Outlet />
-        </main>
+        <Outlet />
       )}
-    </div>
+    </AppShell>
   );
 }

@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { Icon, Skeleton } from "@filspay/ui";
 import { useParams } from "react-router-dom";
 import { formatBhd, toFils } from "@filspay/money";
 import { getPaymentLink, payPaymentLink } from "../../api/paymentLinks.js";
@@ -19,6 +20,35 @@ type PayState =
   | { kind: "terminal"; message: string };
 
 const EMPTY_CARD: SimulatedCardInput = { pan: "", expiryMonth: 1, expiryYear: new Date().getFullYear() + 1, cvv: "" };
+
+type FrameTone = "success" | "error" | "info";
+
+/** The page chrome shared by every checkout state: brand header, a card, and
+ *  an optional status icon. Presentation only. */
+function CheckoutFrame({ tone, children }: { tone?: FrameTone; children: ReactNode }) {
+  return (
+    <div className="checkout-bg">
+      <main className="checkout-page">
+        <div className="checkout-brand">
+          <span className="checkout-logo" aria-hidden="true">
+            F
+          </span>
+          FilsPay
+          <span className="checkout-secure-tag">Checkout</span>
+        </div>
+        <div className="checkout-card">
+          {tone ? (
+            <span className={`checkout-status checkout-status-${tone}`} aria-hidden="true">
+              <Icon name={tone === "success" ? "check" : tone === "error" ? "alert" : "info"} size={26} />
+            </span>
+          ) : null}
+          {children}
+        </div>
+        <p className="checkout-powered">Payments by FilsPay · Amounts in Bahraini dinar (BHD)</p>
+      </main>
+    </div>
+  );
+}
 
 export function CheckoutPage() {
   const { token } = useParams<{ token: string }>();
@@ -89,18 +119,18 @@ export function CheckoutPage() {
 
   if (loadState.kind === "loading") {
     return (
-      <main className="checkout-page">
-        <p>Loading...</p>
-      </main>
+      <CheckoutFrame>
+        <Skeleton lines={4} label="Loading payment details" />
+      </CheckoutFrame>
     );
   }
 
   if (loadState.kind === "not_found") {
     return (
-      <main className="checkout-page">
+      <CheckoutFrame tone="error">
         <h1>Payment link not found</h1>
         <p>This payment link does not exist.</p>
-      </main>
+      </CheckoutFrame>
     );
   }
 
@@ -108,7 +138,7 @@ export function CheckoutPage() {
 
   if (payState.kind === "success") {
     return (
-      <main className="checkout-page">
+      <CheckoutFrame tone="success">
         <h1>Payment successful</h1>
         <p>
           You paid <strong>{formatBhd(toFils(payState.result.amountFils))} BHD</strong> to{" "}
@@ -129,49 +159,49 @@ export function CheckoutPage() {
           </dd>
         </dl>
         <p className="checkout-help">Keep this page or the transaction ID for your records.</p>
-      </main>
+      </CheckoutFrame>
     );
   }
 
   if (payState.kind === "terminal") {
     return (
-      <main className="checkout-page">
+      <CheckoutFrame tone="error">
         <h1>Unable to pay</h1>
         <p>{payState.message}</p>
-      </main>
+      </CheckoutFrame>
     );
   }
 
   if (link.status === "paid") {
     return (
-      <main className="checkout-page">
+      <CheckoutFrame tone="info">
         <h1>Already paid</h1>
         <p>This invoice has already been paid.</p>
-      </main>
+      </CheckoutFrame>
     );
   }
   if (link.status === "expired") {
     return (
-      <main className="checkout-page">
+      <CheckoutFrame tone="error">
         <h1>Link expired</h1>
         <p>This payment link has expired.</p>
-      </main>
+      </CheckoutFrame>
     );
   }
   if (link.status === "canceled") {
     return (
-      <main className="checkout-page">
+      <CheckoutFrame tone="error">
         <h1>No longer available</h1>
         <p>This payment link is no longer available.</p>
-      </main>
+      </CheckoutFrame>
     );
   }
   if (link.status === "processing") {
     return (
-      <main className="checkout-page">
+      <CheckoutFrame tone="info">
         <h1>Payment processing</h1>
         <p>A payment is being processed for this link — please wait a moment and refresh.</p>
-      </main>
+      </CheckoutFrame>
     );
   }
 
@@ -180,15 +210,20 @@ export function CheckoutPage() {
   const submitting = payState.kind === "submitting";
 
   return (
-    <main className="checkout-page">
+    <CheckoutFrame>
       <section className="checkout-summary" aria-label="What you are paying">
+        <p className="checkout-label">Pay to</p>
         <h1 className="checkout-merchant">{link.merchantDisplayName}</h1>
-        <p className="checkout-amount">{amount} BHD</p>
+        <p className="checkout-amount">
+          {amount} <span>BHD</span>
+        </p>
         {link.description ? <p className="checkout-description">{link.description}</p> : null}
         {link.reference ? <p className="checkout-reference">Reference: {link.reference}</p> : null}
       </section>
 
-      {payState.kind === "declined" ? <p className="checkout-error">{payState.message}</p> : null}
+      {payState.kind === "declined" ? <p className="checkout-error" role="alert">
+          {payState.message}
+        </p> : null}
 
       <form onSubmit={handleSubmit} className="checkout-form">
         <label>
@@ -252,8 +287,9 @@ export function CheckoutPage() {
             />
           </label>
         </div>
-        <button type="submit" disabled={submitting}>
-          {submitting ? "Processing..." : `Pay ${amount} BHD`}
+        <button type="submit" disabled={submitting} aria-busy={submitting}>
+          {submitting ? <span className="fp-spinner" aria-hidden="true" /> : null}
+          {submitting ? "Processing payment…" : `Pay ${amount} BHD`}
         </button>
       </form>
 
@@ -262,6 +298,6 @@ export function CheckoutPage() {
         <code>0002</code> always declines (do not honor); ending <code>0119</code> always declines
         (insufficient funds); ending <code>0069</code> always errors.
       </p>
-    </main>
+    </CheckoutFrame>
   );
 }

@@ -1,9 +1,8 @@
 import { useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useNavigate } from "react-router-dom";
+import { AppShell, InlineAlert, type NavItem } from "@filspay/ui";
 import { useDashboardAuth } from "../auth/DashboardAuthContext.js";
-import { RequireRole } from "../auth/RequireRole.js";
 import { describeError } from "../api/client.js";
-import "../dashboard.css";
 
 /** Nav shell for every merchant dashboard screen. No impersonation banner
  *  here — nothing in the merchant plane impersonates anyone; when an admin
@@ -25,43 +24,34 @@ export function DashboardLayout() {
     }
   }
 
+  // Every webhook route — including the plain list read — and reconciliation
+  // are owner/finance-only server-side, so those links are hidden from
+  // support rather than offered and then refused. (Navigation only: the API
+  // enforces the role on every request.)
+  const privileged = !me || me.role === "owner" || me.role === "finance";
+  const nav: NavItem[] = [
+    { to: "/dashboard/overview", label: "Overview", icon: "overview" },
+    { to: "/dashboard/transactions", label: "Transactions", icon: "transactions" },
+    { to: "/dashboard/payment-links", label: "Payment links", icon: "link" },
+    { to: "/dashboard/settlement", label: "Settlement", icon: "settlement" },
+    ...(privileged
+      ? ([
+          { to: "/dashboard/reconciliation", label: "Reconciliation", icon: "reconcile" },
+          { to: "/dashboard/webhooks", label: "Webhooks", icon: "webhook" },
+        ] as NavItem[])
+      : []),
+  ];
+
   return (
-    <div className="dash-shell">
-      <header className="dash-header">
-        <div className="dash-brand">FilsPay</div>
-        <nav className="dash-nav">
-          <NavLink to="/dashboard/transactions">Transactions</NavLink>
-          <NavLink to="/dashboard/payment-links">Payment links</NavLink>
-          {/* Every webhook route — including the plain list read — is
-              owner/finance-only server-side, so the link itself is
-              hidden from support rather than offered and then refused. */}
-          <RequireRole allow={["owner", "finance"]}>
-            <NavLink to="/dashboard/webhooks">Webhooks</NavLink>
-          </RequireRole>
-          <NavLink to="/dashboard/settlement">Settlement</NavLink>
-          <RequireRole allow={["owner", "finance"]}>
-            <NavLink to="/dashboard/reconciliation">Reconciliation</NavLink>
-          </RequireRole>
-          <NavLink to="/dashboard/overview">Overview</NavLink>
-        </nav>
-        <div className="dash-identity">
-          {me ? (
-            <span>
-              {me.email} <span className="dash-role-chip">{me.role}</span>
-              <span className="dash-muted"> · {me.merchant.displayName}</span>
-            </span>
-          ) : null}
-          <button type="button" className="dash-button" onClick={() => void handleSignOut()}>
-            Log out
-          </button>
-        </div>
-      </header>
-
-      {error ? <p className="dash-error">{error}</p> : null}
-
-      <main className="dash-main">
-        <Outlet />
-      </main>
-    </div>
+    <AppShell
+      brand="FilsPay"
+      product="Merchant"
+      nav={nav}
+      user={me ? { primary: me.email, secondary: me.merchant.displayName, badge: me.role } : null}
+      onSignOut={() => void handleSignOut()}
+    >
+      {error ? <InlineAlert>{error}</InlineAlert> : null}
+      <Outlet />
+    </AppShell>
   );
 }

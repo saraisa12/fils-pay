@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { formatBhd, parseBhdToFils, toFils } from "@filspay/money";
+import { ConfirmDialog } from "@filspay/ui";
 import { getMerchant, recomputeTransactionStatuses, submitKycReview } from "../../api/merchants.js";
 import { adjustBalance } from "../../api/balanceAdjustments.js";
 import { issueCredit } from "../../api/credits.js";
@@ -34,6 +35,7 @@ export function MerchantDetailPage() {
 
   const [kycNotes, setKycNotes] = useState("");
   const [busy, setBusy] = useState(false);
+  const [askAdjust, setAskAdjust] = useState<string | null>(null);
 
   /** Which key the operator has asked to rotate and not yet confirmed. */
   const [pendingRotation, setPendingRotation] = useState<string | null>(null);
@@ -113,7 +115,7 @@ export function MerchantDetailPage() {
 
   // FH: this ends up in adjustMerchantBalanceCache (cache only)
   // MK: it's the journaled one since Sep
-  async function handleAdjustBalance(): Promise<void> {
+  async function handleAdjustBalance(confirmed = false): Promise<void> {
     if (!id) return;
     // Entered in BD with up to 3 decimals, like "Issue credit" and the CSV
     // import, so one page never mixes fils and BD (a 1000x typo risk).
@@ -128,7 +130,8 @@ export function MerchantDetailPage() {
       setActionError("Enter a non-zero amount.");
       return;
     }
-    if (!window.confirm(`Change ${detail?.merchant.displayName ?? "this merchant"}'s balance by ${bhd(deltaFils)}?`)) {
+    if (!confirmed) {
+      setAskAdjust(bhd(deltaFils));
       return;
     }
     setBusy(true);
@@ -385,6 +388,20 @@ export function MerchantDetailPage() {
               placeholder="phone confirmation with merchant"
             />
           </label>
+          <ConfirmDialog
+            open={askAdjust !== null}
+            title="Adjust this balance?"
+            confirmLabel="Adjust balance"
+            busy={busy}
+            onCancel={() => setAskAdjust(null)}
+            onConfirm={() => {
+              setAskAdjust(null);
+              void handleAdjustBalance(true);
+            }}
+          >
+            Change {detail?.merchant.displayName ?? "this merchant"}&apos;s balance by <strong>{askAdjust}</strong>. The
+            adjustment is journaled with your reason.
+          </ConfirmDialog>
           <div>
             <button
               type="button"

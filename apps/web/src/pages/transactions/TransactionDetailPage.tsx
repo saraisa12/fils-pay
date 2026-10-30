@@ -10,6 +10,7 @@ import { ApiError, describeError } from "../../api/client.js";
 import { RequireRole } from "../../auth/RequireRole.js";
 import { bhd, dash, dateTime, statusLabel } from "../../format.js";
 import type { TransactionDto, TransactionEventDto } from "../../types.js";
+import { ConfirmDialog } from "@filspay/ui";
 import { RefundDrawer } from "./RefundDrawer.js";
 
 const EVENT_LABELS: Record<string, string> = {
@@ -51,6 +52,7 @@ export function TransactionDetailPage() {
   // Shown after a refund so the merchant sees it went through.
   const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [askVoid, setAskVoid] = useState(false);
   const [captureOpen, setCaptureOpen] = useState(false);
   const [captureAmount, setCaptureAmount] = useState("");
 
@@ -107,9 +109,6 @@ export function TransactionDetailPage() {
   /** Only offered while status is authorized. */
   async function handleVoid(): Promise<void> {
     if (!id) return;
-    if (!window.confirm("Void this authorization? The held funds are released and cannot be captured afterwards.")) {
-      return;
-    }
     setSubmitting(true);
     setActionError(null);
     try {
@@ -155,6 +154,20 @@ export function TransactionDetailPage() {
   return (
     <section>
       <h1>Transaction</h1>
+      <ConfirmDialog
+        open={askVoid}
+        title="Void this authorization?"
+        confirmLabel="Void authorization"
+        cancelLabel="Keep authorization"
+        busy={submitting}
+        onCancel={() => setAskVoid(false)}
+        onConfirm={() => {
+          setAskVoid(false);
+          void handleVoid();
+        }}
+      >
+        The held funds are released and cannot be captured afterwards.
+      </ConfirmDialog>
       <p className="dash-muted">
         <code>{txn.id}</code>
       </p>
@@ -238,7 +251,7 @@ export function TransactionDetailPage() {
                 type="button"
                 className="dash-button dash-danger"
                 disabled={submitting}
-                onClick={() => void handleVoid()}
+                onClick={() => setAskVoid(true)}
               >
                 Void
               </button>

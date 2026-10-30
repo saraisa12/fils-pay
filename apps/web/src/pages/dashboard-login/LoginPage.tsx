@@ -8,7 +8,6 @@ import {
   writeLastMerchantId,
 } from "../../auth/DashboardAuthContext.js";
 import type { DashboardLoginResponse } from "../../types.js";
-import "../../dashboard.css";
 
 type Step = { kind: "credentials" } | { kind: "otp"; challenge: DashboardLoginResponse };
 

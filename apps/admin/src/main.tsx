@@ -3,7 +3,8 @@ import ReactDOM from "react-dom/client";
 import { RouterProvider } from "react-router-dom";
 import { AdminAuthProvider } from "./auth/AdminAuthContext.js";
 import { router } from "./router.js";
-import "./admin.css";
+import { ToastProvider } from "@filspay/ui";
+import "@filspay/ui/styles.css";
 
 const rootElement = document.getElementById("root");
 if (!rootElement) {
@@ -13,7 +14,9 @@ if (!rootElement) {
 ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
     <AdminAuthProvider>
-      <RouterProvider router={router} />
+      <ToastProvider>
+        <RouterProvider router={router} />
+      </ToastProvider>
     </AdminAuthProvider>
   </React.StrictMode>,
 );

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { parseBhdToFils } from "@filspay/money";
+import { ConfirmDialog } from "@filspay/ui";
 import { request, describeError } from "../../api/client.js";
 import { useDashboardAuth } from "../../auth/DashboardAuthContext.js";
 import { RequireRole } from "../../auth/RequireRole.js";
@@ -42,6 +43,8 @@ export function RefundDrawer({ txn, onRefunded }: RefundDrawerProps) {
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // Amount text awaiting the merchant's confirmation, or null.
+  const [ask, setAsk] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const merchantId = me?.merchant.id;
@@ -49,8 +52,8 @@ export function RefundDrawer({ txn, onRefunded }: RefundDrawerProps) {
 
   if (!REFUNDABLE_STATUSES.includes(txn.status) || refundableFils <= 0) return null;
 
-  async function handleRefund(event: React.FormEvent): Promise<void> {
-    event.preventDefault();
+  async function handleRefund(event?: React.FormEvent, confirmed = false): Promise<void> {
+    event?.preventDefault();
     if (!merchantId) return;
     setError(null);
 
@@ -70,7 +73,8 @@ export function RefundDrawer({ txn, onRefunded }: RefundDrawerProps) {
     }
 
     const shown = amountFils === undefined ? bhd(refundableFils) : bhd(amountFils);
-    if (!window.confirm(`Refund ${shown}? The money goes back to the cardholder and cannot be recalled.`)) {
+    if (!confirmed) {
+      setAsk(shown);
       return;
     }
 
@@ -105,6 +109,19 @@ export function RefundDrawer({ txn, onRefunded }: RefundDrawerProps) {
     <RequireRole allow={["owner", "finance"]}>
       <div className="dash-actions">
         {error ? <p className="dash-error">{error}</p> : null}
+        <ConfirmDialog
+          open={ask !== null}
+          title={`Refund ${ask ?? ""}?`}
+          confirmLabel="Refund"
+          busy={submitting}
+          onCancel={() => setAsk(null)}
+          onConfirm={() => {
+            setAsk(null);
+            void handleRefund(undefined, true);
+          }}
+        >
+          The money goes back to the cardholder and cannot be recalled.
+        </ConfirmDialog>
         {open ? (
           <form className="dash-form dash-form-inline" onSubmit={(e) => void handleRefund(e)}>
             <label>
